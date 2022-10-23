@@ -360,6 +360,9 @@ int main()
     close(g_hailer_srvr_lstn_fd);
     close(g_hailer_srvr_ntwrk_lstn_fd);
     unlink(HAILER_SERVER_ADDRESS);
+    PRNT_RED
+    HAILER_DBG_INFO("HAILER Server Exiting!");
+    PRNT_RST
     return 0;
 }
 

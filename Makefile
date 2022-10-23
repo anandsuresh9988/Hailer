@@ -7,16 +7,17 @@ LIB_SRC_DIR = src
 LIB_OBJ_DIR = src/obj
 LIB_SRCS = ${LIB_SRC_DIR}/hailer.c
 LIB_OBJS := $(patsubst $(LIB_SRC_DIR)/%.c, $(LIB_OBJ_DIR)/%.o, $(LIB_SRCS))
-LIB_DEPENDS := ${patsubst ${LIB_SRC_DIR}/%.c,${LIB_OBJ_DIR}/%.d,${LIB_SRCS}}
+LIB_DEPENDS := ${patsubst ${LIB_SRC_DIR}/%.c, ${LIB_OBJ_DIR}/%.d, ${LIB_SRCS}}
 
 SERVER_SRC_DIR = src
 SERVER_OBJ_DIR = src/obj
 SERVER_SRCS = ${SERVER_SRC_DIR}/hailer_server.c
 SERVER_OBJS := $(patsubst $(SERVER_SRC_DIR)/%.c, $(SERVER_OBJ_DIR)/%.o, $(SERVER_SRCS))
-SERVER_DEPENDS := ${patsubst ${SERVER_SRC_DIR}/%.c,${SERVER_OBJ_DIR}/%.d,${SERVER_SRCS}}
+SERVER_DEPENDS := ${patsubst ${SERVER_SRC_DIR}/%.c, ${SERVER_OBJ_DIR}/%.d, ${SERVER_SRCS}}
+LIBS := -lhailer
 
 CC = gcc
-CFLAGS = -fPIC -Wall -Wextra -O2 -g -lhailer
+CFLAGS = -fPIC -Wall -Wextra -O2 -g
 LDFLAGS = -shared
 RM = rm -f
 
@@ -26,9 +27,11 @@ all: ${HAILER_LIB} ${SERVER_EXE} install
 
 $(HAILER_LIB): $(LIB_OBJS)
 	$(CC) ${LDFLAGS} $^ -o $@
+	install -d /usr/lib/
+	install -m 644 $(HAILER_LIB) /usr/lib/
 
 $(SERVER_EXE): $(SERVER_OBJS) ${HAILER_LIB}
-	$(CC) ${CFLAGS} ${SERVER_OBJS} -o $@
+	$(CC) ${CFLAGS} ${SERVER_OBJS} ${LIBS} -o $@
 
 -include ${LIB_DEPENDS} ${SERVER_DEPENDS}
 
@@ -41,9 +44,9 @@ ${SERVER_OBJ_DIR}/%.o: ${SERVER_SRC_DIR}/%.c Makefile ${SERVER_SRC_DIR}/include/
 src/obj:
 	mkdir src/obj
 
-install: $(HAILER_LIB)
-	install -d /usr/lib/
-	install -m 644 $(HAILER_LIB) /usr/lib/
+install: $(SERVER_EXE)
+	install -d /usr/bin/
+	install -m 644 $(SERVER_EXE) /usr/bin/
 
 clean:
 	-${RM} ${HAILER_LIB} $(SERVER_EXE) $(LIB_OBJS) ${LIB_DEPENDS} ${SERVER_OBJS} ${SERVER_DEPENDS}
