@@ -18,73 +18,7 @@ Hailer also provides a library which contains various APIs which can be used by 
 
 # Message sequence diagram
 
-```plantuml
-@startuml
-skinparam ParticipantPadding 20
-skinparam BoxPadding 30
-
-
-autonumber
-box "Node 1" #LightBlue
-participant Node1AppA
-participant Node1AppB
-participant Node1HailerServer
-end box
-
-
-box "Node 2" #LightGreen
-participant Node2HailerServer
-participant Node2AppC
-participant Node2AppD
-end box
-
-
-box "Node 3" #LightYellow
-participant Node3HailerServer
-participant Node3AppE
-end box
-
-== App Initialization ==
-
-Node1AppA -> Node1HailerServer : HAILER_MSG_APP_LAUNCH
-Node1HailerServer -> Node1AppA : HAILER_MSG_APP_REG_SUCCESS
-
-== Inter Process Messaging ==
-
-autonumber 1
-Node1AppA -> Node1HailerServer : HAILER_MSG_1(Dest = Node1AppB)
-Node1HailerServer -> Node1AppB : HAILER_MSG_1(Dest = Node1AppB)
-
-== Inter Node Messaging ==
-
-autonumber 1
-Node1AppA -> Node1HailerServer : HAILER_MSG_1(Dest = Node2AppC)
-Node1HailerServer -> Node2HailerServer : HAILER_MSG_1(Dest = Node2AppC)
-Node2HailerServer -> Node2AppC : HAILER_MSG_1(Dest = Node2AppC)
-
-== Message Transport through Channels  ==
-
-autonumber 1
-Node1AppA -> Node1HailerServer : HAILER_MSG_SUBSCRIBE_CHANNEL1
-Node1HailerServer -> Node1AppA : HAILER_MSG_CHANNEL_SUBSCRIPTION_SUCCESS
-
-Node2AppD -> Node2HailerServer : HAILER_MSG_SUBSCRIBE_CHANNEL1
-Node2HailerServer -> Node2AppD : HAILER_MSG_CHANNEL_SUBSCRIPTION_SUCCESS
-
-Node3AppE -> Node3HailerServer : HAILER_MSG_SUBSCRIBE_CHANNEL1
-Node3HailerServer -> Node3AppE : HAILER_MSG_CHANNEL_SUBSCRIPTION_SUCCESS
-
-
-Node1AppB -> Node1HailerServer : HAILER_MSG_2(Dest = CHANNEL1)
-Node1HailerServer -> Node2HailerServer : HAILER_MSG_2(Dest = CHANNEL1)
-Node1HailerServer -> Node3HailerServer : HAILER_MSG_2(Dest = CHANNEL1)
-Node1HailerServer -> Node1AppA : HAILER_MSG_2
-Node2HailerServer -> Node2AppD : HAILER_MSG_2
-Node3HailerServer -> Node3AppE : HAILER_MSG_2
-
-@enduml
-
-```
+![PlantUML model](www.plantuml.com/plantuml/png/hLDDRvmm4BtxLupIItke5Coj4bM0HGiIeMZ97df2Jh30gh6HCMtKNrydgkD8Nh6osiiUtkpxOERvRjL4wMtcQFt1n48KcQ4r27jY2n6w9SF0n0ZuzjqyayyMZsyHGcJJKcpp8rNeKJx3JIC72j4DVAZPEEcCRnGjJX9Unb6wBEb5DFFHaZ1ELKVLJ-D0nG36nTWwBsozZefIuGdWzmB-r9Zc5z73HRFOcdsddCjV7ZFUTOkDRk5qamGC09LWcX7EVXFDf80aGUXjI_3vgxy6-09bMjN5gR_lZdtQjdsTdfkyHFu_3TrfURHJSUoxSvuNNVUQfXBQS5ebd-Ywmhtv8QCvz6iaTsU8Wl957mzqrP2u8t_Q3vfTvxkmB-3_JsgRiPCKX-jWJyVEh_FD5__zJ0eFYeXraKg3dfJSnWdoYGX1-Gh_je3kd7NvgSgAFY_JfYdgAAHIbcHbseVgM-FwzVQmt0R3Wkmiy10KnBv4gn071udz85Op80XoZRz-6snBOOE4TpDK9WwH2MeA3Zed3jevHdTK3DlC_m00)
 
 
 
