@@ -11,10 +11,12 @@ LIB_DEPENDS := ${patsubst ${LIB_SRC_DIR}/%.c, ${LIB_OBJ_DIR}/%.d, ${LIB_SRCS}}
 
 SERVER_SRC_DIR = src
 SERVER_OBJ_DIR = src/obj
-SERVER_SRCS = ${SERVER_SRC_DIR}/hailer_server.c
+SERVER_SRCS = ${SERVER_SRC_DIR}/hailer_server.c ${SERVER_SRC_DIR}/hailer_peer_discovery.c
 SERVER_OBJS := $(patsubst $(SERVER_SRC_DIR)/%.c, $(SERVER_OBJ_DIR)/%.o, $(SERVER_SRCS))
 SERVER_DEPENDS := ${patsubst ${SERVER_SRC_DIR}/%.c, ${SERVER_OBJ_DIR}/%.d, ${SERVER_SRCS}}
-LIBS := -lhailer
+LIBS := -lhailer -lpthread -ljson-c
+
+TEST_APPS := test-app/test_app*.exe
 
 CC = gcc
 CFLAGS = -fPIC -Wall -Wextra -O2 -g
@@ -49,4 +51,4 @@ install: $(SERVER_EXE)
 	install -m 644 $(SERVER_EXE) /usr/bin/
 
 clean:
-	-${RM} ${HAILER_LIB} $(SERVER_EXE) $(LIB_OBJS) ${LIB_DEPENDS} ${SERVER_OBJS} ${SERVER_DEPENDS}
+	-${RM} ${HAILER_LIB} $(SERVER_EXE) $(LIB_OBJS) ${LIB_DEPENDS} ${SERVER_OBJS} ${SERVER_DEPENDS} ${TEST_APPS}

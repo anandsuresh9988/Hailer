@@ -7,6 +7,7 @@
  *
  */
 
+#define HAILER_PEER_DISCOVERY_BROADCAST 1
 /*******  Generic headers  ********/
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +19,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#ifdef HAILER_PEER_DISCOVERY_BROADCAST
+#include <pthread.h>
+#endif
 // #include <malloc.h>
 
 /*******  HAILER specific headers  ********/
@@ -25,14 +29,22 @@
 #include "./include/hailer_app_id.h"
 #include "./include/hailer_msgtype.h"
 #include "./include/hailer_server.h"
+#ifdef HAILER_PEER_DISCOVERY_BROADCAST
+#include "./include/hailer_peer_discovery.h"
+#endif
+
+#define HAILER_PEER_DISCOVERY_BROADCAST    1
 
 /*******  Global variables  ********/
-unsigned int g_max_fd = 0;
+unsigned int g_max_fd              = 0;
 fd_set g_hailer_srvr_read_fds;
-int g_hailer_srvr_lstn_fd        = -1;     /* descriptor to listen to msgs with the device */
-int g_hailer_srvr_ntwrk_lstn_fd   = -1;     /* descriptor to listen to msgs coming from other devices */
-unsigned g_keep_running = 1;
-apps_data_t *g_apps_data_head = NULL;
+int g_hailer_srvr_lstn_fd          = -1;     /* descriptor to listen to msgs with the device */
+int g_hailer_srvr_ntwrk_lstn_fd    = -1;     /* descriptor to listen to msgs coming from other devices */
+unsigned g_keep_running            = 1;
+apps_data_t *g_apps_data_head      = NULL;
+#ifdef HAILER_PEER_DISCOVERY_BROADCAST
+int g_hailer_peer_discovery_rcv_fd = -1;
+#endif
 
 void sig_handler(int signum)
 {
@@ -234,6 +246,10 @@ int hailer_process_events()
     int ret = HAILER_ERROR, i = 0;
     struct timeval tv = {1, 0};    /*Set select timeout = 1s*/
     hailer_msg_hdr msg_hdr;
+    char buffer[MAX_BUFFRE_SIZE] = {0};
+#if ENCRYPT_MSGS
+    char decryptedMsg[MAX_BUFFRE_SIZE] = {0};
+#endif // ENCRYPT_MSGS
 
     read_fds = g_hailer_srvr_read_fds;
     ret = select(g_max_fd+1, &read_fds, NULL, NULL, &tv);
@@ -307,6 +323,32 @@ int hailer_process_events()
                     HAILER_DBG_ERR("recvfrom() failed!!");
                 }
             }
+ #ifdef HAILER_PEER_DISCOVERY_BROADCAST
+            else if(i == g_hailer_peer_discovery_rcv_fd)
+            {
+                /* We have recieved a node discovery broadcast msg from a peer device */
+                struct sockaddr_in cli_addr;
+
+                int cli_addr_len = sizeof(cli_addr);
+                memset(&cli_addr, 0, sizeof(cli_addr));
+                ret = recvfrom(g_hailer_peer_discovery_rcv_fd,
+                               (char*)buffer, MAX_BUFFRE_SIZE,
+                               MSG_WAITALL,
+                               (struct sockaddr*)(&cli_addr), &cli_addr_len);
+
+                if(ret > 0)
+                {
+                    buffer[ret] = '\0';
+#if ENCRYPT_MSGS
+                    hailer_decrypt_msg(buffer, decryptedMsg);
+                    hailer_process_broadcast_packets(decryptedMsg, cli_addr);
+#else
+                    hailer_process_broadcast_packets(buffer, cli_addr);
+#endif //ENCRYPT_MSGS
+                }
+
+            }
+#endif
             else
             {
                 /* This msg is from an app within the node in which this hailer_server instance is running */
@@ -330,6 +372,10 @@ int hailer_process_events()
 
 int main()
 {
+
+#ifdef HAILER_PEER_DISCOVERY_BROADCAST
+    pthread_t hailer_broadcast_threadid = 1;
+#endif
     /* Register the signal handler */
     signal(SIGSEGV, sig_handler);   /* Signum = 11  */
     signal(SIGINT, sig_handler);    /* Signum = 2  */
@@ -349,6 +395,16 @@ int main()
     FD_SET(g_hailer_srvr_ntwrk_lstn_fd, &g_hailer_srvr_read_fds);
     UPDATE_MAXFD(g_max_fd, g_hailer_srvr_ntwrk_lstn_fd);
 
+#ifdef HAILER_PEER_DISCOVERY_BROADCAST
+    /* Create a socket to listen to node discovery broadcast msgs*/
+    g_hailer_peer_discovery_rcv_fd = init_hailer_peer_discovery_rcv_socket();
+    FD_SET(g_hailer_peer_discovery_rcv_fd, &g_hailer_srvr_read_fds);
+    UPDATE_MAXFD(g_max_fd, g_hailer_peer_discovery_rcv_fd);
+
+    /* Create a thread that periodically send the broacast peer discovery packets */
+    pthread_create(&hailer_broadcast_threadid, NULL, hailer_broadcast_discovery_packets, NULL);
+#endif
+
     while(g_keep_running)
     {
         hailer_process_events();
@@ -359,10 +415,15 @@ int main()
      */
     close(g_hailer_srvr_lstn_fd);
     close(g_hailer_srvr_ntwrk_lstn_fd);
+#ifdef HAILER_PEER_DISCOVERY_BROADCAST
+    close(g_hailer_peer_discovery_rcv_fd);
+#endif
+
     unlink(HAILER_SERVER_ADDRESS);
     PRNT_RED
     HAILER_DBG_INFO("HAILER Server Exiting!");
     PRNT_RST
+
     return 0;
 }
 
