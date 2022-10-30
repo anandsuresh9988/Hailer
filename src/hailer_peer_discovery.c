@@ -21,17 +21,6 @@
 extern unsigned int g_keep_running;
 nodeList_t *g_clientListHead = NULL;
 
-#if 0
-/* Function to handle the SIGINT signal, if the user presses "ctrl+c" */
-void signal_handler(int signum)
-{
-    if(signum == SIGINT)
-    {
-        g_running = 0;
-    }
-}
-#endif
-
 /* Print all the devices and it's info present in the deviceList */
 void printList()
 {
@@ -397,62 +386,6 @@ int hailer_process_broadcast_packets(char *buffer ,struct sockaddr_in cliAddr)
     return 0;
 }
 
-#if 0
-/* Routine which will listen for the Broadcast packets from other devices */
-void *rcvBroadcastsFromNodes()
-{
-    int ret = -1;
-    int rcvSockFd = -1;
-    struct sockaddr_in cliAddr, sendAddr;
-    char buffer[MAX_BUFFRE_SIZE] = {0};
-#if ENCRYPT_MSGS
-    char decryptedMsg[MAX_BUFFRE_SIZE] ={0};
-#endif // ENCRYPT_MSGS
-
-    printf("*** Started RCV thread ***\n");
-    rcvSockFd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if(rcvSockFd <1)
-    {
-        perror("Error creating the socket");
-        return;
-    }
-
-    memset(&sendAddr, 0, sizeof(sendAddr));
-    memset(&cliAddr, 0, sizeof(cliAddr));
-
-    sendAddr.sin_addr.s_addr = INADDR_ANY;
-    sendAddr.sin_family = AF_INET;
-    sendAddr.sin_port = htons(RECV_PORT);
-
-    if(bind(rcvSockFd, (struct sockaddr*)(&sendAddr), sizeof(sendAddr)) < 0)
-    {
-        perror("Error binding to the socket");
-        return;
-    }
-
-    int cliAddrLen = sizeof(cliAddr);
-    while(g_running == 1)
-    {
-        ret = recvfrom(rcvSockFd, (char*)buffer, MAX_BUFFRE_SIZE, MSG_WAITALL, (struct sockaddr*)(&cliAddr), &cliAddrLen);
-
-        if(ret > 0)
-        {
-            buffer[ret] = '\0';
-#if ENCRYPT_MSGS
-            decryptMsg(buffer, decryptedMsg);
-            processBroadcastPackets(decryptedMsg, cliAddr);
-#else
-            processBroadcastPackets(buffer, cliAddr);
-#endif //ENCRYPT_MSGS
-        }
-        memset(&cliAddr, 0, sizeof(cliAddr));
-    }
-
-    printf("*** RCV thread going to exit");
-    close(rcvSockFd);
-}
-#endif
-
 int init_hailer_peer_discovery_rcv_socket(void)
 {
     int ret = -1;
@@ -535,65 +468,3 @@ void *hailer_broadcast_discovery_packets()
     //pthread_join(recvThreadid, NULL);  //TODO: When the SIGINT is raised the braodcast thread is not closing.
     close(sendSockFd);
 }
-
-#if 0
-/* main code */
-int main()
-{
-    struct sockaddr_in broadcastAddr;
-    int sendSockFd = -1;
-    int ret = -1;
-    int EnableBroacast = 1;
-    pthread_t recvThreadid = 1;
-    struct json_object *jsonMsg;
-#if ENCRYPT_MSGS
-    char encryptedMsg[MAX_BUFFRE_SIZE] = {0};
-#endif //ENCRYPT_MSGS
-
-    /* Handle the SIGINT signal */
-    signal(SIGINT, signal_handler);
-
-    /* Start a thread to listen to Broadcast packets from other devices */
-    pthread_create(&recvThreadid, NULL, rcvBroadcastsFromNodes, NULL);
-
-    sendSockFd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if(sendSockFd <1)
-    {
-        perror("Error creating the socket");
-        return -1;
-    }
-
-    ret = setsockopt(sendSockFd, SOL_SOCKET, SO_BROADCAST, &EnableBroacast, sizeof(EnableBroacast));
-    if(ret)
-    {
-        perror("setsockopt failed");
-    }
-
-    memset(&broadcastAddr, 0, sizeof(broadcastAddr));
-    broadcastAddr.sin_addr.s_addr = INADDR_ANY;
-    // TODO : Need a logic to automatically find the braodcast address
-    inet_pton(AF_INET, "192.168.1.255", &broadcastAddr.sin_addr);
-    broadcastAddr.sin_port = htons(BROADCAST_PORT);
-
-    while(g_keep_running == 1)
-    {
-        jsonMsg = json_object_new_object();
-        fillJsonMsg(jsonMsg);
-#if ENCRYPT_MSGS
-        encryptMsg((char*)json_object_to_json_string(jsonMsg), encryptedMsg);
-        ret = sendto(sendSockFd, encryptedMsg, strlen(encryptedMsg), 0,(struct sockaddr*)(&broadcastAddr), sizeof(broadcastAddr));
-#else
-        ret = sendto(sendSockFd, json_object_to_json_string(jsonMsg), strlen(json_object_to_json_string(jsonMsg)), 0,(struct sockaddr*)(&broadcastAddr), sizeof(broadcastAddr));
-#endif //ENCRYPT_MSGS
-        if(ret < 0)
-        {
-            perror("Error sending the broadcast message, sendto() failed");
-        }
-        sleep(KEEP_ALIVE_BROADCAST_INT);
-    }
-
-    //pthread_join(recvThreadid, NULL);  //TODO: When the SIGINT is raised the braodcast thread is not closing.
-    close(sendSockFd);
-}
-
-#endif
