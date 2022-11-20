@@ -44,11 +44,12 @@ unsigned g_keep_running            = 1;
 apps_data_t *g_apps_data_head      = NULL;
 #ifdef HAILER_PEER_DISCOVERY_BROADCAST
 int g_hailer_peer_discovery_rcv_fd = -1;
+hailerShmlist_t *shmList           = NULL;
 #endif
 
 void sig_handler(int signum)
 {
-    if(signum == SIGSEGV || signum == SIGTERM || signum == SIGINT)
+    if( signum == SIGTERM || signum == SIGINT)
     {
         g_keep_running = 0;
         PRNT_RED
@@ -377,7 +378,7 @@ int main()
     pthread_t hailer_broadcast_threadid = 1;
 #endif
     /* Register the signal handler */
-    signal(SIGSEGV, sig_handler);   /* Signum = 11  */
+    //signal(SIGSEGV, sig_handler);   /* Signum = 11  */
     signal(SIGINT, sig_handler);    /* Signum = 2  */
     signal(SIGTERM, sig_handler);   /* Signum = 15 */
 
@@ -396,6 +397,15 @@ int main()
     UPDATE_MAXFD(g_max_fd, g_hailer_srvr_ntwrk_lstn_fd);
 
 #ifdef HAILER_PEER_DISCOVERY_BROADCAST
+    /* Create the shared memory to store the peers info which can be used by other process */
+    shmList = hailer_srvr_shmlist_init();
+    if(shmList == NULL)
+    {
+        PRNT_RED
+        HAILER_DBG_INFO("Error creating shmlist shared memory\n. Exiting");
+        PRNT_RST
+        exit(-1);
+    }
     /* Create a socket to listen to node discovery broadcast msgs*/
     g_hailer_peer_discovery_rcv_fd = init_hailer_peer_discovery_rcv_socket();
     FD_SET(g_hailer_peer_discovery_rcv_fd, &g_hailer_srvr_read_fds);
@@ -417,6 +427,18 @@ int main()
     close(g_hailer_srvr_ntwrk_lstn_fd);
 #ifdef HAILER_PEER_DISCOVERY_BROADCAST
     close(g_hailer_peer_discovery_rcv_fd);
+    if(shmdt(shmList->shmaddr) == 0)
+    {
+        PRNT_GRN
+        HAILER_DBG_INFO("shmList shared memory destroyed\n");
+        PRNT_RST
+    }
+    else
+    {
+        PRNT_RED
+        HAILER_DBG_ERR("Error in freeing the shmList shared memory\n");
+        PRNT_RST
+    }
 #endif
 
     unlink(HAILER_SERVER_ADDRESS);

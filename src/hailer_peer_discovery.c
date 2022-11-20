@@ -7,11 +7,12 @@
  *
  */
 
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<unistd.h>
-#include<signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/shm.h>
 
 #include "./include/hailer_peer_discovery.h"
 #include "./include/hailer.h"
@@ -19,29 +20,33 @@
 
 /*** Global variables ***/
 extern unsigned int g_keep_running;
-nodeList_t *g_clientListHead = NULL;
+extern hailerShmlist_t *shmList;
 
-/* Print all the devices and it's info present in the deviceList */
-void printList()
+/* Print all the devices and it's info present in the device shmList */
+void hailer_print_peer_list()
 {
-    nodeList_t *current = g_clientListHead;
+    int             i = 0;
+    int visited_nodes = 0;
+    nodeList_t *curr_node = shmList->shmlistHead;
 
-    while (current != NULL)
+    for(i = 0; (i < HAILER_MAX_PEERS && visited_nodes < shmList->activePeerCount); i++, curr_node++)
     {
-        printf("\n");
-        printf("IP : %s\n", inet_ntoa(current->client->ipAddr));
-        printf("Last seen time : %ld\n", current->client->lastSeenTimestamp);
-        printf("Last seen time : %Le\n", current->client->uptime);
-        printf("MAC : %s\n", current->client->mac);
-        printf("\n");
-
-        current = current->next;
+        if(curr_node->client.isUsed == TRUE)
+        {
+            HAILER_DBG_INFO("\n");
+            HAILER_DBG_INFO("IP : %s\n", inet_ntoa(curr_node->client.ipAddr));
+            HAILER_DBG_INFO("Last seen time : %ld\n", curr_node->client.lastSeenTimestamp);
+            HAILER_DBG_INFO("Last seen time : %Le\n", curr_node->client.uptime);
+            HAILER_DBG_INFO("MAC : %s\n", curr_node->client.mac);
+            HAILER_DBG_INFO("\n");
+            visited_nodes++;
+        }
     }
 }
 
 #if ENCRYPT_MSGS
 /* Simple routine to encrypt the msg before sending */
-void encryptMsg(char *Msg, char *EncryptedMsg)
+void hailer_encryptMsg(char *Msg, char *EncryptedMsg)
 {
     int i = 0;
     char const key[MAX_BUFFRE_SIZE] = HAILER_ENCRYPTION_KEY;
@@ -59,22 +64,22 @@ void encryptMsg(char *Msg, char *EncryptedMsg)
     }
 
 #if ENCRYPTION_DBG
-    printf("\n====Encrypting Msg====\n\n");
-    printf("    Msg:\n");
+    HAILER_DBG_INFO("\n====Encrypting Msg====\n\n");
+    HAILER_DBG_INFO("    Msg:\n");
 
     for (i = 0; i <  strlen(Msg); i++)
     {
-        printf("%02X ", Msg[i]);
+        HAILER_DBG_INFO("%02X ", Msg[i]);
     }
 
-    printf("\n    Encrypted Msg:\n");
+    HAILER_DBG_INFO("\n    Encrypted Msg:\n");
 
     for (i = 0; i <  strlen(EncryptedMsg); i++)
     {
-        printf("%02X ", EncryptedMsg[i]);
+        HAILER_DBG_INFO("%02X ", EncryptedMsg[i]);
     }
 
-    printf("\n\n====Encrypting Msg Done !====\n");
+    HAILER_DBG_INFO("\n\n====Encrypting Msg Done !====\n");
 #endif //ENCRYPTION_DBG
 
 }
@@ -91,28 +96,28 @@ void hailer_decrypt_msg(char * encryptedMsg, char* decryptedMsg)
     }
 
 #if ENCRYPTION_DBG
-    printf("\n====Decrypting Msg====\n");
-    printf("    Encrypted Msg:\n");
+    HAILER_DBG_INFO("\n====Decrypting Msg====\n");
+    HAILER_DBG_INFO("    Encrypted Msg:\n");
 
     for (i = 0; i <  strlen(encryptedMsg); i++)
     {
-        printf("%02X ", encryptedMsg[i]);
+        HAILER_DBG_INFO("%02X ", encryptedMsg[i]);
     }
 
-    printf("\n    Decrypted Msg:\n");
+    HAILER_DBG_INFO("\n    Decrypted Msg:\n");
 
     for (i = 0; i < strlen(decryptedMsg); i++)
     {
-        printf("%02X ", decryptedMsg[i]);
+        HAILER_DBG_INFO("%02X ", decryptedMsg[i]);
     }
 
-    printf("\n\n====Decrypting Msg Done====\n\n");
+    HAILER_DBG_INFO("\n\n====Decrypting Msg Done====\n\n");
 #endif //ENCRYPTION_DBG
-
 }
 #endif //ENCRYPT_MSGS
+
 /*Get the device hostname using the 'hostname' command*/
-void getDeviceHostname(char *hstname)
+void hailer_get_device_hostname(char *hstname)
 {
     char cmd[256] = {0};
     FILE *fp = NULL;
@@ -122,7 +127,7 @@ void getDeviceHostname(char *hstname)
     fp = popen(cmd, "r");
     if(fp == NULL)
     {
-        printf("Error executing the hostname command \n");
+        HAILER_DBG_ERR("Error executing the hostname command \n");
     }
     else
     {
@@ -132,7 +137,7 @@ void getDeviceHostname(char *hstname)
 }
 
 /* Get the device uptime form /proc/uptime */
-void getDeviceuptime(long double * uptime)
+void hailer_get_device_uptime(long double * uptime)
 {
     char cmd[256] = {0};
     FILE *fp = NULL;
@@ -142,7 +147,7 @@ void getDeviceuptime(long double * uptime)
     fp = popen(cmd, "r");
     if(fp == NULL)
     {
-        printf("Error obtaining the system uptime\n");
+        HAILER_DBG_ERR("Error obtaining the system uptime\n");
     }
     else
     {
@@ -152,26 +157,26 @@ void getDeviceuptime(long double * uptime)
 }
 
 /* Fill the jsonMsg object with required fileds*/
-void fillJsonMsg(struct json_object *jsonMsg)
+void hailer_fill_jsonMsg(struct json_object *jsonMsg)
 {
     char hostname [MAX_HOSTNAME_SIZE] = {0};
     long double uptime;
     char *broadcast_msg = "Peer Boardcast messagae : Keep ALive";
 
-    getDeviceHostname(hostname);
-    getDeviceuptime(&uptime);
+    hailer_get_device_hostname(hostname);
+    hailer_get_device_uptime(&uptime);
     json_object_object_add(jsonMsg, MSG, json_object_new_string(broadcast_msg));
     json_object_object_add(jsonMsg, HOSTNAME, json_object_new_string(hostname));
     json_object_object_add(jsonMsg, UPTIME, json_object_new_double(uptime));
 
 #if JSON_DBG
-    printf("jsonMsg : %s\n", json_object_to_json_string_ext(jsonMsg, JSON_C_TO_STRING_SPACED | JSON_C_TO_STRING_PRETTY));
+    HAILER_DBG_INFO("jsonMsg : %s\n", json_object_to_json_string_ext(jsonMsg, JSON_C_TO_STRING_SPACED | JSON_C_TO_STRING_PRETTY));
 #endif
 
 }
 
 /*Get the MAC address from the IP address using arp command*/
-void findMACfromIp(char *ip, char *mac )
+void hailer_find_MAC_from_IP(char *ip, char *mac )
 {
     char cmd[256] = {0};
     FILE *fp = NULL;
@@ -181,168 +186,225 @@ void findMACfromIp(char *ip, char *mac )
     fp = popen(cmd,"r");
     if(fp == NULL)
     {
-        printf("Error executing arp command to find the MAC address of %s", ip);
+        HAILER_DBG_ERR("Error executing arp command to find the MAC address of %s", ip);
     }
     else
     {
        fscanf(fp, "%s", mac);
-       printf("MAC of %s : %s\n", ip, mac);
+       HAILER_DBG_INFO("MAC of %s : %s\n", ip, mac);
        pclose(fp);
     }
 }
 
 /* Check whether the device with the client->ipAddr IP already exists in the DeviceList */
-unsigned int isClientExists(clientDesc_t *client)
+unsigned int hailer_is_client_exist(clientDesc_t *client)
 {
     unsigned int found = FALSE;
-    nodeList_t *current = g_clientListHead;
+    int              i = 0;
+    int visited_nodes  = 0;
+    nodeList_t *curr_node = shmList->shmlistHead;
 
-    while(current != NULL)
+    for(i = 0; ((i < HAILER_MAX_PEERS) && (visited_nodes < shmList->activePeerCount)); i++, curr_node++)
     {
         //printf("%s %s\n",inet_ntoa(client->ipAddr) , inet_ntoa(current->client->ipAddr));
         /*TODO : Not sure why the below commented code didn't worked !!. Need to check*/
         //if(strcmp(inet_ntoa(client->ipAddr), inet_ntoa(current->client->ipAddr)) == 0 )
-        if(client->ipAddr.s_addr == current->client->ipAddr.s_addr)
+        if(curr_node->client.isUsed == TRUE)
         {
-            found = TRUE;
-            //printf("Client already exists\n");
-            break;
+            if(client->ipAddr.s_addr == curr_node->client.ipAddr.s_addr)
+            {
+                found = TRUE;
+                break;
+            }
+            visited_nodes ++;
         }
-
-        current = current->next;
     }
-
     return found;
 }
 
-/* Add the client to the DEviceList */
-void addDeviceToList(clientDesc_t *client)
+/* Add the client to the DeviceList */
+void hailer_add_device_to_list(clientDesc_t *client)
 {
-    nodeList_t *newNode = (nodeList_t*)malloc(sizeof(nodeList_t));
-    nodeList_t *lastNode = g_clientListHead;
+    int              i = 0;
+    int visited_nodes  = 0;
+    nodeList_t *curr_node = shmList->shmlistHead;
 
-    memset(newNode, 0, sizeof(nodeList_t));
-
-    newNode->client = client;
-    strcpy(newNode->client->hostname, client->hostname);
-    findMACfromIp(inet_ntoa(client->ipAddr), newNode->client->mac);
-    newNode->client->ipAddr.s_addr = client->ipAddr.s_addr;
-    newNode->client->lastSeenTimestamp = client->lastSeenTimestamp;
-    newNode->client->uptime = client->uptime;
-
-    newNode->next = NULL;
-
-    if(lastNode == NULL)
+    for(i = 0; i < HAILER_MAX_PEERS; i++, curr_node++)
     {
-        printf("Adding first node to list\n");
-        g_clientListHead = newNode;
-    }
-    else
-    {
-        printf("Adding a new node \n");
-        while(lastNode->next != NULL)
+        if(curr_node->client.isUsed == FALSE)
         {
-            lastNode = lastNode->next;
+            strcpy(curr_node->client.hostname, client->hostname);
+            hailer_find_MAC_from_IP(inet_ntoa(client->ipAddr), curr_node->client.mac);
+            curr_node->client.ipAddr.s_addr = client->ipAddr.s_addr;
+            curr_node->client.lastSeenTimestamp = client->lastSeenTimestamp;
+            curr_node->client.uptime = client->uptime;
+            curr_node->client.isUsed = TRUE;
+
+            shmList->activePeerCount++;
+            break;
         }
-
-        lastNode->next = newNode;
     }
-
-    return;
 }
 
 /* Check whether any device which is currently not sending the Keep Alive messgae is present in the
    DeviceList. If present delete the device */
-void deleteExpiredDevices()
+void hailer_delete_expired_devices()
 {
-    nodeList_t *current = g_clientListHead, *prev = NULL;
+    nodeList_t *curr_node = shmList->shmlistHead;
+    int i                 = 0;
+    int visited_nodes     = 0;
+    time_t now            = time(NULL);
 
-    time_t now = time(NULL);
-    while(current != NULL)
+    for(i = 0; ((i < HAILER_MAX_PEERS) && (visited_nodes < shmList->activePeerCount)); i++, curr_node++)
     {
-        if(now - current->client->lastSeenTimestamp > TIME_TO_WAIT_TO_DEL_DEVICE)
+        if(curr_node->client.isUsed == TRUE)
         {
-            if(current == g_clientListHead)
+            if(now - curr_node->client.lastSeenTimestamp > TIME_TO_WAIT_TO_DEL_DEVICE)
             {
-                g_clientListHead = current->next;
-                free(current);
-                current = g_clientListHead;
+                memset(curr_node, 0, sizeof(nodeList_t));
+                curr_node->client.isUsed = FALSE;
+                shmList->activePeerCount--;
+                /* Reduce the visited_count as well to make sure that for loop's
+                 * termination condition will be satisfied as expected without
+                 * the loop running for HAILER_MAX_PEERS times.
+                 */
+                visited_nodes--;
             }
-            else
-            {
-                prev->next = current->next;
-                free(current);
-                current = prev->next;
-            }
-        }
-        else
-        {
-           prev = current;
-           current = current->next;
+            visited_nodes++;
         }
     }
 }
 
-/* Update the file CLIENTS_LIST_FILE with the latest info available in the list pointed by g_clientListHead */
-void updateClientFile()
+/* Update the file CLIENTS_LIST_FILE with the latest info available in the list pointed by shmList->shmlistHead; */
+void hailer_update_client_file()
 {
     FILE *fp = fopen(CLIENTS_LIST_FILE, "w");
-    nodeList_t *current = g_clientListHead;
-    unsigned int count = 0;
+    nodeList_t *curr_node = shmList->shmlistHead;
+    int i = 0;
+    int visited_nodes = 0;
 
-    while(current != NULL)
+    fprintf(fp, "Total Peers : %d\n\n\n", shmList->activePeerCount);
+    for(i = 0; ((i < HAILER_MAX_PEERS) && (visited_nodes < shmList->activePeerCount)); i++, curr_node++)
     {
-        count++;
-        fprintf(fp, "Client NO: %d\n", count );
-        fprintf(fp, "IP Address: %s\n", inet_ntoa(current->client->ipAddr));
-        fprintf(fp, "Last seen time stamp: %ld\n", current->client->lastSeenTimestamp);
-        fprintf(fp, "Uptime: %Le\n", current->client->uptime);
-        fprintf(fp, "MAC: %s\n", current->client->mac);
-        fprintf(fp, "\n");
-        current = current->next;
+        if(curr_node->client.isUsed == TRUE)
+        {
+            visited_nodes++;
+            fprintf(fp, "Client NO: %d\n", visited_nodes);
+            fprintf(fp, "IP Address: %s\n", inet_ntoa(curr_node->client.ipAddr));
+            fprintf(fp, "Last seen time stamp: %ld\n", curr_node->client.lastSeenTimestamp);
+            fprintf(fp, "Uptime: %Le\n", curr_node->client.uptime);
+            fprintf(fp, "MAC: %s\n", curr_node->client.mac);
+            fprintf(fp, "\n");
+        }
     }
-
     fclose(fp);
 }
 
 /* If the device is already present in the list just update it's timestamp */
-void updateTimestamp(clientDesc_t *client)
+void hailer_update_timestamp(clientDesc_t *client)
 {
-    nodeList_t *current = g_clientListHead;
-    while(current != NULL)
-    {
-        /*TODO : Not sure why the below commented code didn't worked !!. Need to check*/
-        //if(strncmp(inet_ntoa(client->ipAddr), inet_ntoa(current->client->ipAddr), sizeof(struct in_addr)) ==0 )
-        if(client->ipAddr.s_addr == current->client->ipAddr.s_addr)
-        {
-            current->client->lastSeenTimestamp = client->lastSeenTimestamp;
-            current->client->uptime = client->uptime;
+    int i             = 0;
+    int visited_nodes = 0;
+    nodeList_t *curr_node = shmList->shmlistHead;
 
-            break;
+    for(i = 0; ((i < HAILER_MAX_PEERS) && (visited_nodes < shmList->activePeerCount)); i++, curr_node++)
+    {
+        if(curr_node->client.isUsed == TRUE)
+        {
+            /*TODO : Not sure why the below commented code didn't worked !!. Need to check*/
+            //if(strncmp(inet_ntoa(client->ipAddr), inet_ntoa(current->client->ipAddr), sizeof(struct in_addr)) ==0 )
+            if(client->ipAddr.s_addr == curr_node->client.ipAddr.s_addr)
+            {
+                curr_node->client.lastSeenTimestamp = client->lastSeenTimestamp;
+                curr_node->client.uptime = client->uptime;
+                break;
+            }
+            visited_nodes++;
         }
-        current = current->next;
     }
 }
 
 /* Update the DeviceList and the file based on the latest Rcvd Broadcast packet */
-void updateClientList(clientDesc_t *client)
+void hailer_update_client_list(clientDesc_t *client)
 {
     unsigned int newDevice = 0;
-    if(isClientExists(client) == FALSE)
+
+    if(hailer_is_client_exist(client) == FALSE)
     {
-        printf("Adding new client to list\n");
-        addDeviceToList(client);
-        printList();
+        HAILER_DBG_INFO("Adding new client to list\n");
+        hailer_add_device_to_list(client);
+        hailer_print_peer_list();
         newDevice = 1;
     }
 
-    updateTimestamp(client);
-    deleteExpiredDevices();
-    updateClientFile();
+    hailer_update_timestamp(client);
+    hailer_delete_expired_devices();
+    hailer_update_client_file();
     if(newDevice == 0)
     {
         free(client);
     }
+}
+
+/* Function to initialise the hailer shared memory list
+ * For server we should create the shared memory and allocate enough memory
+ * for MAX PEERS hailer will support and initialse all the peer data structures.
+ * For all other applications using this shared memory, the 'client' init routine
+ * should return the shared memory starting address, so that they can use the info
+ */
+hailerShmlist_t *hailer_srvr_shmlist_init()
+{
+    int shmid                = -1;
+    int shm_total_sz         = 0;
+    hailerShmlist_t *shmList = NULL;
+    int i                    = 0;
+    nodeList_t *curr_node    = NULL;
+
+    HAILER_DBG_INFO("Creating Hailer shmList\n");
+
+    /* Calcualte the required size of the shared memory.
+     * When any new data strucutres are added to the hailer
+     * shared memory, include the extra memory required here
+     */
+    shm_total_sz = sizeof(hailerShmlist_t) + sizeof(nodeList_t);
+    /* Create the required shared memory */
+    shmid  = shmget((key_t)HAILER_SHMLIST_KEY, shm_total_sz, 0666|IPC_CREAT);
+    if(shmid != -1)
+    {
+        HAILER_DBG_INFO("Created shmList shared memory\n");
+    }
+    else
+    {
+        HAILER_DBG_ERR("ShmList shared memory creation failed!!\n");
+        return NULL;
+    }
+
+    shmList =(hailerShmlist_t *)shmat(shmid, (void*)0, 0);
+    if(shmList != NULL)
+    {
+        HAILER_DBG_INFO("Cshmat() success\n");
+    }
+    else
+    {
+         HAILER_DBG_ERR("ShmList shmat() failed!!\n");
+    }
+    shmList->activePeerCount = 0;
+    shmList->shmid = shmid;
+    shmList->shmaddr = shmList;
+
+    HAILER_DBG_INFO("Intialising Hailer shmlist\n");
+
+    /* Intialise the list */
+    curr_node = shmList->shmlistHead;
+    for(i = 0; i < HAILER_MAX_PEERS; i++, curr_node++)
+    {
+        memset(curr_node, 0, sizeof(nodeList_t));
+        curr_node->client.isUsed = FALSE;
+        curr_node->next = curr_node + 1;
+    }
+    curr_node->next = NULL;
+
+    return shmList;
 }
 
 /* Routine to process the info present in the Broadcat UDP packet Rcvd */
@@ -355,8 +417,6 @@ int hailer_process_broadcast_packets(char *buffer ,struct sockaddr_in cliAddr)
     json_object *uptime;
 
     memset(client, 0, sizeof(client));
-    //printf("Rcvd Msg from IP -%s \n", inet_ntoa(cliAddr.sin_addr));
-
     jsonMsg = json_tokener_parse(buffer);
     json_object_object_get_ex(jsonMsg, UPTIME, &uptime);
 
@@ -367,23 +427,17 @@ int hailer_process_broadcast_packets(char *buffer ,struct sockaddr_in cliAddr)
     host = gethostbyaddr(&cliAddr.sin_addr, sizeof(cliAddr.sin_addr), AF_INET);
     if(host == NULL)
     {
-        //printf("Error getting hostanme for IP %s. \
-                Using value from the json formatted msg from the client\n",\
-                                              inet_ntoa(cliAddr.sin_addr));
         json_object *hostname;
         json_object_object_get_ex(jsonMsg, HOSTNAME, &hostname);
         strncpy(client->hostname, json_object_get_string(hostname),json_object_get_string_len(hostname));
-        //printf("Hostname : %s\n", client->hostname);
     }
     else
     {
-        //printf("Hostname : %s\n", host->h_name);
         strncpy(client->hostname, host->h_name, sizeof(client->hostname));
     }
-
-    updateClientList(client);
-    //printf("\n");
-    return 0;
+    
+    hailer_update_client_list(client);
+    return HAILER_SUCCESS;
 }
 
 int init_hailer_peer_discovery_rcv_socket(void)
@@ -399,12 +453,11 @@ int init_hailer_peer_discovery_rcv_socket(void)
     rcvSockFd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if(rcvSockFd <1)
     {
-        perror("Error creating the socket");
+        HAILER_DBG_ERR("Error creating the socket");
         return HAILER_ERROR;
     }
 
     memset(&sendAddr, 0, sizeof(sendAddr));
-
     sendAddr.sin_addr.s_addr = INADDR_ANY;
     sendAddr.sin_family = AF_INET;
     sendAddr.sin_port = htons(HAILER_PEER_DISCOVERY_BROADCAST_PORT);
@@ -439,7 +492,7 @@ void *hailer_broadcast_discovery_packets()
     ret = setsockopt(sendSockFd, SOL_SOCKET, SO_BROADCAST, &EnableBroacast, sizeof(EnableBroacast));
     if(ret)
     {
-        perror("setsockopt failed");
+        HAILER_DBG_ERR("setsockopt failed");
     }
 
     memset(&broadcastAddr, 0, sizeof(broadcastAddr));
@@ -451,16 +504,16 @@ void *hailer_broadcast_discovery_packets()
     while(g_keep_running == 1)
     {
         jsonMsg = json_object_new_object();
-        fillJsonMsg(jsonMsg);
+        hailer_fill_jsonMsg(jsonMsg);
 #if ENCRYPT_MSGS
-        encryptMsg((char*)json_object_to_json_string(jsonMsg), encryptedMsg);
+        hailer_encryptMsg((char*)json_object_to_json_string(jsonMsg), encryptedMsg);
         ret = sendto(sendSockFd, encryptedMsg, strlen(encryptedMsg), 0,(struct sockaddr*)(&broadcastAddr), sizeof(broadcastAddr));
 #else
         ret = sendto(sendSockFd, json_object_to_json_string(jsonMsg), strlen(json_object_to_json_string(jsonMsg)), 0,(struct sockaddr*)(&broadcastAddr), sizeof(broadcastAddr));
 #endif //ENCRYPT_MSGS
         if(ret < 0)
         {
-            perror("Error sending the broadcast message, sendto() failed");
+            HAILER_DBG_ERR("Error sending the broadcast message, sendto() failed");
         }
         sleep(KEEP_ALIVE_BROADCAST_INT);
     }

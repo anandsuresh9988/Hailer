@@ -1,7 +1,7 @@
 /**
- * @file    lan_monit.h
+ * @file    hailer_peer_discovery.h
  * @author  Anand S
- * @date    26 Sep 2021
+ * @date    23 Oct 2022
  * @version 0.1
  * @brief   Adule to see MAC addresses of all linux machines in the LAN which has installed this module through a keep alive message
  * 
@@ -32,6 +32,10 @@
 #define TIME_TO_WAIT_TO_DEL_DEVICE 10   // wait 10 secs before deleting a device from the devicelist if we 
                                         // are not getting anymore KEEP ALIVE messages from it
 
+#define HAILER_MAX_PEERS           255   // Max no of peers hailer peer discovery mechanism can support.
+                                         // Use this value to intialise the shared memroy list to store peer details
+#define HAILER_SHMLIST_KEY         0x647651cefd98     // Key for the Hailer shared memory
+
 /*JSON Msg keys*/
 
 #define MSG      "msg"
@@ -52,6 +56,7 @@
 #endif //
 typedef struct _clientDesc
 {
+    int isUsed;
     struct in_addr ipAddr;
     char hostname[MAX_HOSTNAME_SIZE];
     char mac[18];
@@ -61,14 +66,24 @@ typedef struct _clientDesc
 
 typedef struct _nodeList
 {
-    clientDesc_t *client;
+    clientDesc_t client;
     struct _nodeList *next;
 } nodeList_t;
+
+typedef struct _hailer_shmlist
+{
+    nodeList_t shmlistHead[HAILER_MAX_PEERS];
+    int activePeerCount;
+    int shmid;
+    struct _hailer_shmlist *shmaddr;
+} hailerShmlist_t;
 
 /* Function prototypes */
 int  init_hailer_peer_discovery_rcv_socket(void);
 void *hailer_broadcast_discovery_packets();
 int  hailer_process_broadcast_packets(char *buffer ,struct sockaddr_in cliAddr);
 void hailer_decrypt_msg(char * encryptedMsg, char* decryptedMsg);
+hailerShmlist_t *hailer_srvr_shmlist_init(void);
+//hailerShmlist_t *hailer_client_shmlist_init(void);
 
 #endif //LAN_MONIT_H
