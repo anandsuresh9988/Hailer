@@ -15,6 +15,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/shm.h>
 
 /*******  HAILER specific headers  ********/
 #include "./include/hailer.h"
@@ -115,4 +116,48 @@ int hailer_rcv_msg(int fd, hailer_msg_hdr *msg_hdr)
 
     ret = read(fd, msg_hdr, sizeof(hailer_msg_hdr));
     return ret;
+}
+
+hailerShmlist_t *hailer_client_shmlist_init(void)
+{
+    int shmid                = -1;
+    int shm_total_sz         = 0;
+    hailerShmlist_t *shmList = NULL;
+    int i                    = 0;
+    nodeList_t *curr_node    = NULL;
+
+    /* Calcualte the required size of the shared memory.
+     * When any new data strucutres are added to the hailer
+     * shared memory, include the extra memory required here
+     */
+    shm_total_sz = sizeof(hailerShmlist_t) + sizeof(nodeList_t);
+
+    /* Get the ID of shared memory which will be already cretaed by hailer server */
+    shmid  = shmget((key_t)HAILER_SHMLIST_KEY, shm_total_sz, 0666);
+    if(shmid != -1)
+    {
+        HAILER_DBG_INFO("shmList ID = %d\n", shmid);
+    }
+    else
+    {
+        HAILER_DBG_ERR("Failed to get shmid\n");
+        return NULL;
+    }
+
+    shmList =(hailerShmlist_t *)shmat(shmid, (void*)0, 0);
+    if(shmList != NULL)
+    {
+        HAILER_DBG_INFO("Cshmat() success\n");
+    }
+    else
+    {
+         HAILER_DBG_ERR("ShmList shmat() failed!!\n");
+    }
+
+    /* Note:
+     * Donot modify the values of the hailerShmlist_t pointer or intilise any nodes here
+     * This will be alreday done by hailer server. Here just return the starting address
+     * of the shared memory for other apps to retrieve the data when required.
+    */
+    return shmList;
 }

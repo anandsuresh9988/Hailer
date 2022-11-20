@@ -12,6 +12,7 @@
 
 /*********  Headers   *******/
 #include <stdio.h>
+#include <arpa/inet.h>
 #include "hailer_app_id.h"
 #include "hailer_msgtype.h"
 
@@ -52,6 +53,19 @@
 #define PRNT_RST printf("\033[0m");
 #define PRNT_RED printf("\033[1;31m");
 
+#define HAILER_MAX_PEERS           255   // Max no of peers hailer peer discovery mechanism can support.
+                                         // Use this value to intialise the shared memroy list to store peer details
+#define HAILER_SHMLIST_KEY         0x647651cefd98     // Key for the Hailer shared memory
+#define MAX_HOSTNAME_SIZE          256
+
+#ifndef FALSE
+#define FALSE (0)
+#endif //FALSE
+
+#ifndef TRUE
+#define TRUE (1)
+#endif  //TRUE
+
 
 /*********   Common structs   ******/
 typedef struct _hailer_msg_handle
@@ -70,6 +84,30 @@ typedef struct _hailer_msg_hdr
     void *msg;
     int msg_len;
 } hailer_msg_hdr;
+
+typedef struct _clientDesc
+{
+    int isUsed;
+    struct in_addr ipAddr;
+    char hostname[MAX_HOSTNAME_SIZE];
+    char mac[18];
+    time_t lastSeenTimestamp;
+    long double uptime;
+} clientDesc_t;
+
+typedef struct _nodeList
+{
+    clientDesc_t client;
+    struct _nodeList *next;
+} nodeList_t;
+
+typedef struct _hailer_shmlist
+{
+    nodeList_t shmlistHead[HAILER_MAX_PEERS];
+    int activePeerCount;
+    int shmid;
+    struct _hailer_shmlist *shmaddr;
+} hailerShmlist_t;
 
 #define INITIALISE_HAILER_MSG_HDR(msg_hdr) \
         do { \
@@ -99,6 +137,9 @@ int hailer_rcv_msg_with_timeout(hailer_msg_handle *msg_handle, hailer_msg_hdr *m
 
 /* Call this API during exit of all app using hailer*/
 int hailer_app_unregister(hailer_msg_handle *msg_handle);
+
+/* API to init the shmList shared memory for hailer client apps */
+hailerShmlist_t *hailer_client_shmlist_init(void);
 
 
 #endif //NBHUS_H

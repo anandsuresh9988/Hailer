@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/shm.h>
 #ifdef HAILER_PEER_DISCOVERY_BROADCAST
 #include <pthread.h>
 #endif

@@ -17,4 +17,6 @@ typedef struct _appsData
     struct _appsData *next;
 } apps_data_t;
 
+hailerShmlist_t *hailer_srvr_shmlist_init(void);
+
 #endif //HAILER_SERVER_H
