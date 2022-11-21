@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/shm.h>
+#include <sys/sem.h>
 
 /*******  HAILER specific headers  ********/
 #include "./include/hailer.h"
@@ -160,4 +161,30 @@ hailerShmlist_t *hailer_client_shmlist_init(void)
      * of the shared memory for other apps to retrieve the data when required.
     */
     return shmList;
+}
+
+/* API to lock semaphore for synchronising shared memory access */
+void hailer_shmList_lock(int sem_lock_id)
+{
+    /* Structure for semaphore operations */
+    struct sembuf sem_op;
+
+    /* Wait on the semaphore, unless it's value is non-negative */
+    sem_op.sem_num = 0;
+    sem_op.sem_op  = -1;
+    sem_op.sem_flg = 0;
+    semop(sem_lock_id, &sem_op, 1);
+}
+
+/* API to ulock semaphore for synchronising shared memory access */
+void hailer_shmList_unlock(int sem_lock_id)
+{
+    /* Structure for semaphore operations */
+    struct sembuf sem_op;
+
+    /* signal the semaphore - increase its value by one */
+    sem_op.sem_num = 0;
+    sem_op.sem_op  = 1;
+    sem_op.sem_flg = 0;
+    semop(sem_lock_id, &sem_op, 1);
 }

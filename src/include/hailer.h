@@ -56,6 +56,7 @@
 #define HAILER_MAX_PEERS           255   // Max no of peers hailer peer discovery mechanism can support.
                                          // Use this value to intialise the shared memroy list to store peer details
 #define HAILER_SHMLIST_KEY         0x647651cefd98     // Key for the Hailer shared memory
+#define HAILER_SHM_LCK_KEY         0x647651cefd99     // Key for the Hailer semaphore for synchronising the shared memory access
 #define MAX_HOSTNAME_SIZE          256
 
 #ifndef FALSE
@@ -106,6 +107,7 @@ typedef struct _hailer_shmlist
     nodeList_t shmlistHead[HAILER_MAX_PEERS];
     int activePeerCount;
     int shmid;
+    int sem_lock_id;
     struct _hailer_shmlist *shmaddr;
 } hailerShmlist_t;
 
@@ -133,7 +135,8 @@ int hailer_send_msg(hailer_msg_hdr *msg_hdr, int fd);
 int hailer_rcv_msg(int fd, hailer_msg_hdr *msg_hdr);
 
 /* API to Rcv msgs without timeout */
-int hailer_rcv_msg_with_timeout(hailer_msg_handle *msg_handle, hailer_msg_hdr *msg_hdr, int timeout);
+/* TODO: Need to implement */
+//int hailer_rcv_msg_with_timeout(hailer_msg_handle *msg_handle, hailer_msg_hdr *msg_hdr, int timeout);
 
 /* Call this API during exit of all app using hailer*/
 int hailer_app_unregister(hailer_msg_handle *msg_handle);
@@ -141,5 +144,10 @@ int hailer_app_unregister(hailer_msg_handle *msg_handle);
 /* API to init the shmList shared memory for hailer client apps */
 hailerShmlist_t *hailer_client_shmlist_init(void);
 
+/* API to lock semaphore for synchronising shared memory access */
+void hailer_shmList_lock(int sem_lock_id);
+
+/* API to ulock semaphore for synchronising shared memory access */
+void hailer_shmList_unlock(int sem_lock_id);
 
 #endif //NBHUS_H
