@@ -428,6 +428,15 @@ int main()
     close(g_hailer_srvr_ntwrk_lstn_fd);
 #ifdef HAILER_PEER_DISCOVERY_BROADCAST
     close(g_hailer_peer_discovery_rcv_fd);
+
+    /* De-allocate the shared memory segment */
+    if (semctl(shmList->sem_lock_id, 1, IPC_RMID) == -1)
+    {
+        PRNT_RED
+        HAILER_DBG_ERR("Error in freeing shared memory segment\n");
+        PRNT_RST
+    }
+
     if(shmdt(shmList->shmaddr) == 0)
     {
         PRNT_GRN
