@@ -137,7 +137,7 @@ hailerShmlist_t *hailer_client_shmlist_init(void)
     shmid  = shmget((key_t)HAILER_SHMLIST_KEY, shm_total_sz, 0666);
     if(shmid != -1)
     {
-        HAILER_DBG_INFO("shmList ID = %d\n", shmid);
+        //HAILER_DBG_INFO("shmList ID = %d\n", shmid);
     }
     else
     {
@@ -148,7 +148,7 @@ hailerShmlist_t *hailer_client_shmlist_init(void)
     shmList =(hailerShmlist_t *)shmat(shmid, (void*)0, 0);
     if(shmList != NULL)
     {
-        HAILER_DBG_INFO("Cshmat() success\n");
+        //HAILER_DBG_INFO("Cshmat() success\n");
     }
     else
     {
