@@ -14,13 +14,15 @@
 #include <signal.h>
 #include <sys/shm.h>	 /* shared memory functions and structs */
 #include <sys/sem.h>	 /* semaphore functions and structs */
+#include <errno.h>
 
 #include "./include/hailer_peer_discovery.h"
 #include "./include/hailer.h"
-
+#include "./include/hailer_server.h"
 
 /*** Global variables ***/
 extern unsigned int g_keep_running;
+extern unsigned int g_hailer_srver_loglvl;
 extern hailerShmlist_t *shmList;
 
 /* Print all the devices and it's info present in the device shmList */
@@ -420,14 +422,14 @@ hailerShmlist_t *hailer_srvr_shmlist_init()
     }
 
     /* Create Semaphore for synchronising the access to the shared memory */
-    sem_lock_id = semget((key_t)HAILER_SHM_LCK_KEY, 1, 0666 | IPC_CREAT | IPC_EXCL);
+    sem_lock_id = semget((key_t)HAILER_SHM_LCK_KEY, 1, 0666 | IPC_CREAT );
     if(sem_lock_id != -1)
     {
         HAILER_DBG_INFO("semget() success\n");
     }
     else
     {
-        HAILER_DBG_ERR("semget() failed\n");
+        HAILER_DBG_ERR("semget() failed errno = %d\n", errno);
         return NULL;
     }
 

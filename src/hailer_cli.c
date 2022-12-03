@@ -3,20 +3,26 @@
  * @author  Anand S
  * @date    27 Nov 2022
  * @version 0.1
- * @brief   CLI toll for hailer
+ * @brief   CLI tool for hailer
  *
  */
 
 /* General headers */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <getopt.h>
 
 /* Hailer specific headers  */
 #include "include/hailer.h"
 
+#define OPTIONAL_ARGUMENT_IS_PRESENT \
+    ((optarg == NULL && optind < argc && argv[optind][0] != '-') \
+     ? (uint8_t) (optarg = argv[optind++]) \
+     : (optarg != NULL))
+
 /* Print all the devices and it's info present in the device shmList */
-void hailer_cli_print_peer_list( )
+void hailer_clli_print_peer_list(void)
 {
     int             i = 0;
     int visited_nodes = 0;
@@ -26,7 +32,7 @@ void hailer_cli_print_peer_list( )
     shmList = hailer_client_shmlist_init();
     if(shmList == NULL)
     {
-        HAILER_DBG_ERR("hailer_client_shmlist_init() failed! \n");
+        printf("hailer_client_shmlist_init() failed! \n");
         exit(-1);
     }
 
@@ -48,20 +54,87 @@ void hailer_cli_print_peer_list( )
     hailer_shmList_unlock(shmList->sem_lock_id);
 }
 
+int hailer_cli_app_intialise(hailer_msg_handle *msg_handle)
+{
+    if(hailer_app_register(msg_handle,  APP_ID_HAILER_CLI) != HAILER_SUCCESS)
+    {
+        printf("hailer_app_register failed !! \n");
+        return HAILER_ERROR;
+    }
+    return HAILER_SUCCESS;
+}
+
+int hailer_cli_send_and_get_reply(hailer_msg_hdr *msghdr,hailer_msg_hdr *rply_msg_hdr,  hailer_msg_handle *msg_handle)
+{
+    hailer_send_msg(msghdr, msg_handle->comm_fd);
+    hailer_rcv_msg(msg_handle->comm_fd, rply_msg_hdr);
+
+    return HAILER_SUCCESS;
+}
+
+int hailer_cli_get_logelevel(int * logelevel)
+{
+    hailer_msg_handle msg_handle;
+    hailer_msg_hdr msg_hdr;
+    hailer_msg_hdr *rply_msg_hdr = NULL;
+    int log = 0;
+    char buf[1024] = {0};
+    rply_msg_hdr = (hailer_msg_hdr *)buf;
+
+    INITIALISE_HAILER_MSG_HDR(msg_hdr);
+    hailer_cli_app_intialise(&msg_handle);
+
+    msg_hdr.sndr_app_id = msg_handle.app_id;
+    msg_hdr.rcvr_app_id = APP_ID_HAILER_SERVER;
+    msg_hdr.msg_type    = HAILER_CLI_LOGLEVEL_GET;
+
+    hailer_cli_send_and_get_reply(&msg_hdr, rply_msg_hdr, &msg_handle);
+    hailer_app_unregister(&msg_handle);
+    log = *((char*)(rply_msg_hdr +1));
+    *logelevel = log;
+
+    return HAILER_SUCCESS;
+}
+
+int hailer_cli_set_logelevel(int loglevel)
+{
+    hailer_msg_handle msg_handle;
+    hailer_msg_hdr *msg_hdr = NULL;
+    hailer_msg_hdr rply_msg_hdr;
+    char buf[1024] = {0};
+    msg_hdr = (hailer_msg_hdr *)buf;
+
+    INITIALISE_HAILER_MSG_HDR_PTR(msg_hdr);
+    hailer_cli_app_intialise(&msg_handle);
+
+    msg_hdr->msg_type    = HAILER_CLI_LOGLEVEL_SET;
+    msg_hdr->sndr_app_id = msg_handle.app_id;
+    msg_hdr->rcvr_app_id = APP_ID_HAILER_SERVER;
+    msg_hdr->msg_len     = sizeof(int);
+    memcpy((char*)(msg_hdr + 1) , &loglevel, msg_hdr->msg_len);
+    hailer_cli_send_and_get_reply(msg_hdr, &rply_msg_hdr, &msg_handle);
+
+    hailer_app_unregister(&msg_handle);
+    if(rply_msg_hdr.msg_type != HAILER_SRVR_RQST_RPLY_SUCCESS)
+    {
+        return HAILER_ERROR;
+    }
+    return HAILER_SUCCESS;
+}
+
 void usage(void)
 {
-    PRNT_GRN
-    printf("\n    HAILER - Inter/intra node communication  Library \n\n");
-    PRNT_RST
-    printf("Usage: hailer_cli -s or --show\n");
-    printf("       hailer_cli -h or --help\n");
+    printf("Usage: hailer_cli -s or --show                -  Dump all available info about the peers in the network\n");
+    printf("       hailer_cli -l or --loglevel [loglevel] -  Get/Set hailer loglevel\n");
+    printf("       hailer_cli -h or --help                -  Display hailer CLI help text\n");
 }
 
 /* Options supported by hailer cli */
 const struct option options[] =
 {
-    {"show", no_argument, 0, 's'},
-    {"help", no_argument, 0, 'h'},
+    {"show",      no_argument, 0, 's'},
+    {"logelevel", optional_argument, 0, 'l'},
+    {"help",      no_argument, 0, 'h'},
     {NULL, 0, 0, '\0'}
 };
 
@@ -74,20 +147,59 @@ int main(int argc, char *argv[])
         exit(0);
     }
 
-    while ((opt = getopt_long(argc, argv, "sh", options, NULL))!= -1)
+    while ((opt = getopt_long(argc, argv, "sl::h", options, NULL))!= -1)
     {
+         PRNT_GRN
+         printf("\n    HAILER - Inter/intra node communication  Library \n\n");
+         PRNT_RST
         switch(opt)
         {
             case 's':
-                /* Dump all peer's info in the network with hailer installed */
-                hailer_cli_print_peer_list();
-                break;
+            {
+                    /* Dump all peer's info in the network with hailer installed */
+                    hailer_clli_print_peer_list();
+                    break;
+            }
 
+            case 'l':
+            {
+                if(OPTIONAL_ARGUMENT_IS_PRESENT)
+                {
+                    int loglevel = atoi(optarg);
+                    printf("We need to set loglevel to %d\n", loglevel);
+                    if((loglevel < HAILER_LOGLEVEL_NONE) || (loglevel > HAILER_LOGLEVEL_DBG))
+                    {
+                        PRNT_RED    printf("Invalid loglevel!\n");    PRNT_RST
+                    }
+                    else
+                    {
+                        /* Send the new logelevl to the hailer server and get reply*/
+                        if(hailer_cli_set_logelevel(loglevel) == HAILER_SUCCESS)
+                        {
+                            PRNT_GRN   printf("Hailer server loglevel set!\n");    PRNT_RST
+                        }
+                        else
+                        {
+                            PRNT_RED    printf("Loglevel set failed!\n");    PRNT_RST
+                        }
+                    }
+                }
+                else
+                {
+                    /* Print Hailer server loglevel */
+                    int loglevel = -1;
+                    hailer_cli_get_logelevel(&loglevel);
+                    printf("Hailer server loglevel = %d\n", loglevel);
+                }
+                break;
+            }
             case 'h':
             default :
+            {
                 /* Not the right way of using halier CLI. Display Hailer usage info */
                 usage();
                 break;
+            }
         }
     }
     exit(0);

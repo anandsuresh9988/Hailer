@@ -25,6 +25,12 @@
 #define HAILER_SUCCESS 0
 #define HAILER_ERROR   -1
 
+/************* HAILER LOGLEVELS  *******/
+
+#define HAILER_LOGLEVEL_NONE 0
+#define HAILER_LOGLEVEL_ERR  1
+#define HAILER_LOGLEVEL_INFO 2
+#define HAILER_LOGLEVEL_DBG  3
 
 /********* LOGGING  ************/
 #define HAILER_DBG_ENABLE 1
@@ -82,7 +88,7 @@ typedef struct _hailer_msg_hdr
     int sndr_app_id;
     int rcvr_app_id;
     msg_type_t msg_type;
-    void *msg;
+    char data[0];
     int msg_len;
 } hailer_msg_hdr;
 
@@ -118,10 +124,24 @@ typedef struct _hailer_shmlist
             msg_hdr.sndr_app_id = -1; \
             msg_hdr.rcvr_app_id = APP_ID_HAILER_SERVER; \
             msg_hdr.msg_type = -1; \
-            msg_hdr.msg = NULL; \
+            msg_hdr.data[0] = 0; \
             msg_hdr.msg_len = 0; \
         } while(0)
 
+#define INITIALISE_HAILER_MSG_HDR_PTR(pmsg_hdr) \
+        do { \
+            if(pmsg_hdr == NULL) \
+            { \
+                return HAILER_ERROR; \
+            } \
+            strncpy(&pmsg_hdr->sndr_ip[0], "127.0.0.1", strlen("127.0.0.1") + 1); \
+            strncpy(&pmsg_hdr->rcvr_ip[0], "127.0.0.1", strlen("127.0.0.1") + 1); \
+            pmsg_hdr->sndr_app_id = -1; \
+            pmsg_hdr->rcvr_app_id = APP_ID_HAILER_SERVER; \
+            pmsg_hdr->msg_type = -1; \
+            pmsg_hdr->data[0] = 0; \
+            pmsg_hdr->msg_len = 0; \
+        } while(0)
 
 /**********  API's  ****************/
 
