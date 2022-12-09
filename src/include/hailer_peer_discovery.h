@@ -1,3 +1,5 @@
+#ifndef HAILER_PEER_DISCOVERY_H
+#define HAILER_PEER_DISCOVERY_H
 /**
  * @file    hailer_peer_discovery.h
  * @author  Anand S
@@ -6,9 +8,6 @@
  * @brief   Adule to see MAC addresses of all linux machines in the LAN which has installed this module through a keep alive message
  * 
  */
-
-#ifndef HAILER_PEER_DISCOVERY_H
-#define HAILER_PEER_DISCOVERY_H 1
 
 #include<sys/socket.h>
 #include<netinet/in.h>
@@ -56,4 +55,4 @@ void *hailer_broadcast_discovery_packets();
 int  hailer_process_broadcast_packets(char *buffer ,struct sockaddr_in cliAddr);
 void hailer_decrypt_msg(char * encryptedMsg, char* decryptedMsg);
 
-#endif //LAN_MONIT_H
+#endif //HAILER_PEER_DISCOVERY_H

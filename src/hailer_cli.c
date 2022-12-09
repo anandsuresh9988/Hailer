@@ -13,7 +13,7 @@
 #include <string.h>
 #include <getopt.h>
 
-/* Hailer specific headers  */
+/* Hailer specific headers */
 #include "include/hailer.h"
 
 #define OPTIONAL_ARGUMENT_IS_PRESENT \
@@ -22,12 +22,12 @@
      : (optarg != NULL))
 
 /* Print all the devices and it's info present in the device shmList */
-void hailer_clli_print_peer_list(void)
+static void hailer_clli_print_peer_list(void)
 {
     int             i = 0;
     int visited_nodes = 0;
     hailerShmlist_t *shmList = NULL;
-    nodeList_t *curr_node = NULL;
+    nodeList_t *curr_node    = NULL;
 
     shmList = hailer_client_shmlist_init();
     if(shmList == NULL)
@@ -54,9 +54,10 @@ void hailer_clli_print_peer_list(void)
     hailer_shmList_unlock(shmList->sem_lock_id);
 }
 
-int hailer_cli_app_intialise(hailer_msg_handle *msg_handle)
+/* Register hailer cli with server app to send and recieve messages */
+static int hailer_cli_app_intialise(hailer_msg_handle *msg_handle)
 {
-    if(hailer_app_register(msg_handle,  APP_ID_HAILER_CLI) != HAILER_SUCCESS)
+    if(hailer_app_register(msg_handle, APP_ID_HAILER_CLI) != HAILER_SUCCESS)
     {
         printf("hailer_app_register failed !! \n");
         return HAILER_ERROR;
@@ -64,7 +65,8 @@ int hailer_cli_app_intialise(hailer_msg_handle *msg_handle)
     return HAILER_SUCCESS;
 }
 
-int hailer_cli_send_and_get_reply(hailer_msg_hdr *msghdr,hailer_msg_hdr *rply_msg_hdr,  hailer_msg_handle *msg_handle)
+/* Send a msg to hailer server and wait for the reply */
+static int hailer_cli_send_and_get_reply(hailer_msg_hdr *msghdr, hailer_msg_hdr *rply_msg_hdr,  hailer_msg_handle *msg_handle)
 {
     hailer_send_msg(msghdr, msg_handle->comm_fd);
     hailer_rcv_msg(msg_handle->comm_fd, rply_msg_hdr);
@@ -72,7 +74,8 @@ int hailer_cli_send_and_get_reply(hailer_msg_hdr *msghdr,hailer_msg_hdr *rply_ms
     return HAILER_SUCCESS;
 }
 
-int hailer_cli_get_logelevel(int * logelevel)
+/* Routine to get the current loglevel of hailer server */
+static int hailer_cli_get_logelevel(int *logelevel)
 {
     hailer_msg_handle msg_handle;
     hailer_msg_hdr msg_hdr;
@@ -82,21 +85,26 @@ int hailer_cli_get_logelevel(int * logelevel)
     rply_msg_hdr = (hailer_msg_hdr *)buf;
 
     INITIALISE_HAILER_MSG_HDR(msg_hdr);
+    /* Register with hailer server */
     hailer_cli_app_intialise(&msg_handle);
 
     msg_hdr.sndr_app_id = msg_handle.app_id;
     msg_hdr.rcvr_app_id = APP_ID_HAILER_SERVER;
     msg_hdr.msg_type    = HAILER_CLI_LOGLEVEL_GET;
 
+    /* Send the request to hailer server and wait for reply */
     hailer_cli_send_and_get_reply(&msg_hdr, rply_msg_hdr, &msg_handle);
+    /* We have got the info from the server. De-register the app */
     hailer_app_unregister(&msg_handle);
+    /* Extract the loglevel info from the reply msg */
     log = *((char*)(rply_msg_hdr +1));
     *logelevel = log;
 
     return HAILER_SUCCESS;
 }
 
-int hailer_cli_set_logelevel(int loglevel)
+/* Routine to set the hailer server loglevel */
+static int hailer_cli_set_logelevel(int loglevel)
 {
     hailer_msg_handle msg_handle;
     hailer_msg_hdr *msg_hdr = NULL;
@@ -122,7 +130,8 @@ int hailer_cli_set_logelevel(int loglevel)
     return HAILER_SUCCESS;
 }
 
-void usage(void)
+/* Display Hailer CLI usage info */
+static void usage(void)
 {
     printf("Usage: hailer_cli -s or --show                -  Dump all available info about the peers in the network\n");
     printf("       hailer_cli -l or --loglevel [loglevel] -  Get/Set hailer loglevel\n");
@@ -132,15 +141,16 @@ void usage(void)
 /* Options supported by hailer cli */
 const struct option options[] =
 {
-    {"show",      no_argument, 0, 's'},
+    {"show",      no_argument,       0, 's'},
     {"logelevel", optional_argument, 0, 'l'},
-    {"help",      no_argument, 0, 'h'},
-    {NULL, 0, 0, '\0'}
+    {"help",      no_argument,       0, 'h'},
+    {NULL,        0,                 0, '\0'}
 };
 
 int main(int argc, char *argv[])
 {
     int opt;
+
     if(argc < 2)
     {
         usage();
@@ -149,38 +159,45 @@ int main(int argc, char *argv[])
 
     while ((opt = getopt_long(argc, argv, "sl::h", options, NULL))!= -1)
     {
-         PRNT_GRN
-         printf("\n    HAILER - Inter/intra node communication  Library \n\n");
-         PRNT_RST
+        PRNT_GRN
+        printf("\n    HAILER - Inter/intra node communication  Library\n\n");
+        PRNT_RST
+
         switch(opt)
         {
             case 's':
             {
-                    /* Dump all peer's info in the network with hailer installed */
-                    hailer_clli_print_peer_list();
-                    break;
+                /* Dump all peer's info in the network with hailer installed */
+                hailer_clli_print_peer_list();
+                break;
             }
 
             case 'l':
             {
                 if(OPTIONAL_ARGUMENT_IS_PRESENT)
                 {
+                    /* Optional argument is preset. So we need to set the server loglevel */
                     int loglevel = atoi(optarg);
-                    printf("We need to set loglevel to %d\n", loglevel);
                     if((loglevel < HAILER_LOGLEVEL_NONE) || (loglevel > HAILER_LOGLEVEL_DBG))
                     {
-                        PRNT_RED    printf("Invalid loglevel!\n");    PRNT_RST
+                        PRNT_RED
+                        printf("Invalid loglevel!\n");
+                        PRNT_RST
                     }
                     else
                     {
                         /* Send the new logelevl to the hailer server and get reply*/
                         if(hailer_cli_set_logelevel(loglevel) == HAILER_SUCCESS)
                         {
-                            PRNT_GRN   printf("Hailer server loglevel set!\n");    PRNT_RST
+                            PRNT_GRN
+                            printf("Hailer server loglevel set!\n");
+                            PRNT_RST
                         }
                         else
                         {
-                            PRNT_RED    printf("Loglevel set failed!\n");    PRNT_RST
+                            PRNT_RED
+                            printf("Loglevel set failed!\n");
+                            PRNT_RST
                         }
                     }
                 }
@@ -193,6 +210,7 @@ int main(int argc, char *argv[])
                 }
                 break;
             }
+
             case 'h':
             default :
             {
