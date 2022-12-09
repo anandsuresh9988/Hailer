@@ -12,14 +12,17 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/shm.h>
+#include <sys/shm.h>	 /* shared memory functions and structs */
+#include <sys/sem.h>	 /* semaphore functions and structs */
+#include <errno.h>
 
 #include "./include/hailer_peer_discovery.h"
 #include "./include/hailer.h"
-
+#include "./include/hailer_server.h"
 
 /*** Global variables ***/
 extern unsigned int g_keep_running;
+extern unsigned int g_hailer_srver_loglvl;
 extern hailerShmlist_t *shmList;
 
 /* Print all the devices and it's info present in the device shmList */
@@ -28,6 +31,8 @@ void hailer_print_peer_list()
     int             i = 0;
     int visited_nodes = 0;
     nodeList_t *curr_node = shmList->shmlistHead;
+
+    hailer_shmList_lock(shmList->sem_lock_id);
 
     for(i = 0; (i < HAILER_MAX_PEERS && visited_nodes < shmList->activePeerCount); i++, curr_node++)
     {
@@ -42,6 +47,7 @@ void hailer_print_peer_list()
             visited_nodes++;
         }
     }
+    hailer_shmList_unlock(shmList->sem_lock_id);
 }
 
 #if ENCRYPT_MSGS
@@ -204,6 +210,8 @@ unsigned int hailer_is_client_exist(clientDesc_t *client)
     int visited_nodes  = 0;
     nodeList_t *curr_node = shmList->shmlistHead;
 
+    hailer_shmList_lock(shmList->sem_lock_id);
+
     for(i = 0; ((i < HAILER_MAX_PEERS) && (visited_nodes < shmList->activePeerCount)); i++, curr_node++)
     {
         //printf("%s %s\n",inet_ntoa(client->ipAddr) , inet_ntoa(current->client->ipAddr));
@@ -219,6 +227,8 @@ unsigned int hailer_is_client_exist(clientDesc_t *client)
             visited_nodes ++;
         }
     }
+    hailer_shmList_unlock(shmList->sem_lock_id);
+
     return found;
 }
 
@@ -228,6 +238,8 @@ void hailer_add_device_to_list(clientDesc_t *client)
     int              i = 0;
     int visited_nodes  = 0;
     nodeList_t *curr_node = shmList->shmlistHead;
+
+    hailer_shmList_lock(shmList->sem_lock_id);
 
     for(i = 0; i < HAILER_MAX_PEERS; i++, curr_node++)
     {
@@ -244,6 +256,8 @@ void hailer_add_device_to_list(clientDesc_t *client)
             break;
         }
     }
+
+    hailer_shmList_unlock(shmList->sem_lock_id);
 }
 
 /* Check whether any device which is currently not sending the Keep Alive messgae is present in the
@@ -255,6 +269,7 @@ void hailer_delete_expired_devices()
     int visited_nodes     = 0;
     time_t now            = time(NULL);
 
+    hailer_shmList_lock(shmList->sem_lock_id);
     for(i = 0; ((i < HAILER_MAX_PEERS) && (visited_nodes < shmList->activePeerCount)); i++, curr_node++)
     {
         if(curr_node->client.isUsed == TRUE)
@@ -273,6 +288,7 @@ void hailer_delete_expired_devices()
             visited_nodes++;
         }
     }
+    hailer_shmList_unlock(shmList->sem_lock_id);
 }
 
 /* Update the file CLIENTS_LIST_FILE with the latest info available in the list pointed by shmList->shmlistHead; */
@@ -282,6 +298,8 @@ void hailer_update_client_file()
     nodeList_t *curr_node = shmList->shmlistHead;
     int i = 0;
     int visited_nodes = 0;
+
+    hailer_shmList_lock(shmList->sem_lock_id);
 
     fprintf(fp, "Total Peers : %d\n\n\n", shmList->activePeerCount);
     for(i = 0; ((i < HAILER_MAX_PEERS) && (visited_nodes < shmList->activePeerCount)); i++, curr_node++)
@@ -297,6 +315,8 @@ void hailer_update_client_file()
             fprintf(fp, "\n");
         }
     }
+    hailer_shmList_unlock(shmList->sem_lock_id);
+
     fclose(fp);
 }
 
@@ -306,6 +326,8 @@ void hailer_update_timestamp(clientDesc_t *client)
     int i             = 0;
     int visited_nodes = 0;
     nodeList_t *curr_node = shmList->shmlistHead;
+
+    hailer_shmList_lock(shmList->sem_lock_id);
 
     for(i = 0; ((i < HAILER_MAX_PEERS) && (visited_nodes < shmList->activePeerCount)); i++, curr_node++)
     {
@@ -322,6 +344,7 @@ void hailer_update_timestamp(clientDesc_t *client)
             visited_nodes++;
         }
     }
+    hailer_shmList_unlock(shmList->sem_lock_id);
 }
 
 /* Update the DeviceList and the file based on the latest Rcvd Broadcast packet */
@@ -355,10 +378,19 @@ void hailer_update_client_list(clientDesc_t *client)
 hailerShmlist_t *hailer_srvr_shmlist_init()
 {
     int shmid                = -1;
+    int sem_lock_id          = -1;
     int shm_total_sz         = 0;
     hailerShmlist_t *shmList = NULL;
     int i                    = 0;
     nodeList_t *curr_node    = NULL;
+
+    /* semaphore value, for semctl() */
+    union semun
+    {
+        int val;
+        struct semid_ds *buf;
+        ushort * array;
+    } sem_val;
 
     HAILER_DBG_INFO("Creating Hailer shmList\n");
 
@@ -388,6 +420,28 @@ hailerShmlist_t *hailer_srvr_shmlist_init()
     {
          HAILER_DBG_ERR("ShmList shmat() failed!!\n");
     }
+
+    /* Create Semaphore for synchronising the access to the shared memory */
+    sem_lock_id = semget((key_t)HAILER_SHM_LCK_KEY, 1, 0666 | IPC_CREAT );
+    if(sem_lock_id != -1)
+    {
+        HAILER_DBG_INFO("semget() success\n");
+    }
+    else
+    {
+        HAILER_DBG_ERR("semget() failed errno = %d\n", errno);
+        return NULL;
+    }
+
+    /* Intialize the semaphore to '1' */
+    sem_val.val = 1;
+    if (semctl(sem_lock_id, 0, SETVAL, sem_val) == -1)
+    {
+	    HAILER_DBG_ERR("Semaphore initialisation failed!");
+	    return NULL;
+    }
+
+    shmList->sem_lock_id = sem_lock_id;
     shmList->activePeerCount = 0;
     shmList->shmid = shmid;
     shmList->shmaddr = shmList;
@@ -396,6 +450,8 @@ hailerShmlist_t *hailer_srvr_shmlist_init()
 
     /* Intialise the list */
     curr_node = shmList->shmlistHead;
+    hailer_shmList_lock(shmList->sem_lock_id);
+
     for(i = 0; i < HAILER_MAX_PEERS; i++, curr_node++)
     {
         memset(curr_node, 0, sizeof(nodeList_t));
@@ -403,6 +459,7 @@ hailerShmlist_t *hailer_srvr_shmlist_init()
         curr_node->next = curr_node + 1;
     }
     curr_node->next = NULL;
+    hailer_shmList_unlock(shmList->sem_lock_id);
 
     return shmList;
 }

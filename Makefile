@@ -2,6 +2,7 @@
 
 HAILER_LIB = bin/libhailer.so
 SERVER_EXE = bin/hailer_server
+HAILER_CLI = bin/hailer_cli
 
 LIB_SRC_DIR = src
 LIB_OBJ_DIR = src/obj
@@ -14,6 +15,10 @@ SERVER_OBJ_DIR = src/obj
 SERVER_SRCS = ${SERVER_SRC_DIR}/hailer_server.c ${SERVER_SRC_DIR}/hailer_peer_discovery.c
 SERVER_OBJS := $(patsubst $(SERVER_SRC_DIR)/%.c, $(SERVER_OBJ_DIR)/%.o, $(SERVER_SRCS))
 SERVER_DEPENDS := ${patsubst ${SERVER_SRC_DIR}/%.c, ${SERVER_OBJ_DIR}/%.d, ${SERVER_SRCS}}
+
+HAILER_CLI_SRC_DIR = src
+HAILER_CLI_SRC = ${HAILER_CLI_SRC_DIR}/hailer_cli.c
+
 LIBS := -lhailer -lpthread -ljson-c
 
 TEST_APPS := test-app/test_app*.exe
@@ -25,7 +30,7 @@ RM = rm -f
 
 .PHONY: all clean install
 
-all: ${HAILER_LIB} ${SERVER_EXE} install
+all: ${HAILER_LIB} ${SERVER_EXE} ${HAILER_CLI} install
 
 $(HAILER_LIB): $(LIB_OBJS)
 	$(CC) ${LDFLAGS} $^ -o $@
@@ -34,6 +39,9 @@ $(HAILER_LIB): $(LIB_OBJS)
 
 $(SERVER_EXE): $(SERVER_OBJS) ${HAILER_LIB}
 	$(CC) ${CFLAGS} ${SERVER_OBJS} ${LIBS} -o $@
+
+$(HAILER_CLI): $(HAILER_CLI_SRC) ${HAILER_LIB}
+	$(CC) ${CFLAGS} ${HAILER_CLI_SRC} ${LIBS} -o $@
 
 -include ${LIB_DEPENDS} ${SERVER_DEPENDS}
 
@@ -48,7 +56,8 @@ src/obj:
 
 install: $(SERVER_EXE)
 	install -d /usr/bin/
-	install -m 644 $(SERVER_EXE) /usr/bin/
+	install -m 744 $(SERVER_EXE) /usr/bin/
+	install -m 744 $(HAILER_CLI) /usr/bin/
 
 clean:
-	-${RM} ${HAILER_LIB} $(SERVER_EXE) $(LIB_OBJS) ${LIB_DEPENDS} ${SERVER_OBJS} ${SERVER_DEPENDS} ${TEST_APPS}
+	-${RM} ${HAILER_LIB} $(SERVER_EXE) $(HAILER_CLI) $(LIB_OBJS) ${LIB_DEPENDS} ${SERVER_OBJS} ${SERVER_DEPENDS} ${TEST_APPS}
