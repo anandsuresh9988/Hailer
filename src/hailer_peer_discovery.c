@@ -3,10 +3,12 @@
  * @author  Anand S
  * @date    23 Oct 2022
  * @version 0.1
- * @brief   Module to see MAC addresses of all linux machines in the LAN which has installed this module through a keep alive message
+ * @brief   Module to see MAC addresses of all linux machines in the LAN which has installed this
+ *          module through a keep alive broadcast message
  *
  */
 
+/* General headers */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +18,7 @@
 #include <sys/sem.h>	 /* semaphore functions and structs */
 #include <errno.h>
 
+/* Hailer specific headers */
 #include "./include/hailer_peer_discovery.h"
 #include "./include/hailer.h"
 #include "./include/hailer_server.h"
@@ -90,7 +93,7 @@ void hailer_encryptMsg(char *Msg, char *EncryptedMsg)
 
 }
 
-/*Simple routine to decrypt the Msg*/
+/* Simple routine to decrypt the Msg */
 void hailer_decrypt_msg(char * encryptedMsg, char* decryptedMsg)
 {
     int i = 0;
@@ -122,7 +125,7 @@ void hailer_decrypt_msg(char * encryptedMsg, char* decryptedMsg)
 }
 #endif //ENCRYPT_MSGS
 
-/*Get the device hostname using the 'hostname' command*/
+/* Get the device hostname using the 'hostname' command */
 void hailer_get_device_hostname(char *hstname)
 {
     char cmd[256] = {0};
@@ -162,7 +165,7 @@ void hailer_get_device_uptime(long double * uptime)
     }
 }
 
-/* Fill the jsonMsg object with required fileds*/
+/* Fill the jsonMsg object with required fileds */
 void hailer_fill_jsonMsg(struct json_object *jsonMsg)
 {
     char hostname [MAX_HOSTNAME_SIZE] = {0};
@@ -181,7 +184,7 @@ void hailer_fill_jsonMsg(struct json_object *jsonMsg)
 
 }
 
-/*Get the MAC address from the IP address using arp command*/
+/* Get the MAC address from the IP address using arp command */
 void hailer_find_MAC_from_IP(char *ip, char *mac )
 {
     char cmd[256] = {0};
@@ -214,9 +217,6 @@ unsigned int hailer_is_client_exist(clientDesc_t *client)
 
     for(i = 0; ((i < HAILER_MAX_PEERS) && (visited_nodes < shmList->activePeerCount)); i++, curr_node++)
     {
-        //printf("%s %s\n",inet_ntoa(client->ipAddr) , inet_ntoa(current->client->ipAddr));
-        /*TODO : Not sure why the below commented code didn't worked !!. Need to check*/
-        //if(strcmp(inet_ntoa(client->ipAddr), inet_ntoa(current->client->ipAddr)) == 0 )
         if(curr_node->client.isUsed == TRUE)
         {
             if(client->ipAddr.s_addr == curr_node->client.ipAddr.s_addr)
@@ -261,7 +261,8 @@ void hailer_add_device_to_list(clientDesc_t *client)
 }
 
 /* Check whether any device which is currently not sending the Keep Alive messgae is present in the
-   DeviceList. If present delete the device */
+ * DeviceList. If present delete the device
+ */
 void hailer_delete_expired_devices()
 {
     nodeList_t *curr_node = shmList->shmlistHead;
@@ -291,7 +292,7 @@ void hailer_delete_expired_devices()
     hailer_shmList_unlock(shmList->sem_lock_id);
 }
 
-/* Update the file CLIENTS_LIST_FILE with the latest info available in the list pointed by shmList->shmlistHead; */
+/* Update the file CLIENTS_LIST_FILE with the latest info available in the list pointed by shmList->shmlistHead */
 void hailer_update_client_file()
 {
     FILE *fp = fopen(CLIENTS_LIST_FILE, "w");
@@ -333,8 +334,6 @@ void hailer_update_timestamp(clientDesc_t *client)
     {
         if(curr_node->client.isUsed == TRUE)
         {
-            /*TODO : Not sure why the below commented code didn't worked !!. Need to check*/
-            //if(strncmp(inet_ntoa(client->ipAddr), inet_ntoa(current->client->ipAddr), sizeof(struct in_addr)) ==0 )
             if(client->ipAddr.s_addr == curr_node->client.ipAddr.s_addr)
             {
                 curr_node->client.lastSeenTimestamp = client->lastSeenTimestamp;
@@ -418,7 +417,7 @@ hailerShmlist_t *hailer_srvr_shmlist_init()
     }
     else
     {
-         HAILER_DBG_ERR("ShmList shmat() failed!!\n");
+        HAILER_DBG_ERR("ShmList shmat() failed!!\n");
     }
 
     /* Create Semaphore for synchronising the access to the shared memory */
@@ -497,6 +496,9 @@ int hailer_process_broadcast_packets(char *buffer ,struct sockaddr_in cliAddr)
     return HAILER_SUCCESS;
 }
 
+/* Routine to initialise the hailer server socket which listens
+ * to broadcast packets from other peers in the network
+ */
 int init_hailer_peer_discovery_rcv_socket(void)
 {
     int ret = -1;
@@ -528,6 +530,9 @@ int init_hailer_peer_discovery_rcv_socket(void)
     return rcvSockFd;
 }
 
+/* Routine which creates a socket and sends broadcast packets to all other peers in the
+ * network. This runs in a separate thread spwaned by hialer server
+ */
 void *hailer_broadcast_discovery_packets()
 {
     struct sockaddr_in broadcastAddr;

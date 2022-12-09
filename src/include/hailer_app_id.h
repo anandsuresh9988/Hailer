@@ -12,7 +12,7 @@
 typedef enum app_id
 {
     APP_ID_HAILER_SERVER = 0,
-    APP_ID_HAILER_CLI,
+    APP_ID_HAILER_CLI,    /* Hailer CLI tool */
     APP_ID_APP_A,
     APP_ID_APP_B,
 
