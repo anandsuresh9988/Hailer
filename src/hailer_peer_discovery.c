@@ -29,7 +29,7 @@
 extern unsigned int g_keep_running;
 extern unsigned int g_hailer_srver_loglvl;
 extern hailerShmlist_t *shmList;
-extern g_hailer_interface[MAX_SIZE_80];
+extern char g_hailer_interface[MAX_SIZE_80];
 
 /* Print all the devices and it's info present in the device shmList */
 void hailer_print_peer_list()

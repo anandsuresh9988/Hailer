@@ -50,7 +50,7 @@ apps_data_t *g_apps_data_head      = NULL;
 #ifdef HAILER_PEER_DISCOVERY_BROADCAST
 int g_hailer_peer_discovery_rcv_fd = -1;
 hailerShmlist_t *shmList           = NULL;
-g_hailer_interface[MAX_SIZE_80]    = {0};
+char g_hailer_interface[MAX_SIZE_80]    = {0};
 #endif
 
 void sig_handler(int signum)
