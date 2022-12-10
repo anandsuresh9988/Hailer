@@ -565,6 +565,7 @@ void *hailer_broadcast_discovery_packets()
 
     while(g_keep_running == 1)
     {
+        HAILER_DBG_DEBUG("Inside discovery message loop");
         jsonMsg = json_object_new_object();
         hailer_fill_jsonMsg(jsonMsg);
 #if ENCRYPT_MSGS
@@ -575,7 +576,7 @@ void *hailer_broadcast_discovery_packets()
 #endif //ENCRYPT_MSGS
         if(ret < 0)
         {
-            HAILER_DBG_ERR("Error sending the broadcast message, sendto() failed");
+            HAILER_DBG_ERR("Error sending the broadcast message, sendto() failed, errno = %d, ret = %d", errno, ret);
         }
         sleep(KEEP_ALIVE_BROADCAST_INT);
     }

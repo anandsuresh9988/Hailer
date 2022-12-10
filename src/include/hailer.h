@@ -73,6 +73,7 @@
 #define TRUE (1)
 #endif  //TRUE
 
+#define MAX_SIZE_80    80
 
 /*********   Common structs   ******/
 typedef struct _hailer_msg_handle

@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <time.h>
 
 /* Hailer specific headers */
 #include "include/hailer.h"
@@ -21,13 +22,42 @@
      ? (uint8_t) (optarg = argv[optind++]) \
      : (optarg != NULL))
 
+/* Covert secs to a string in the format HH:MM:SS */
+static int hailer_secs_to_time_string(long double tiem_in_secs, char* time_str, int len)
+{
+
+    int secs = 0, mins = 0, hrs = 0;
+
+    hrs  = (tiem_in_secs / 3600);
+    mins = (tiem_in_secs - (hrs *3600)) / 60;
+    secs = (tiem_in_secs - (hrs * 3600) - (mins *60));
+
+    if(hrs != 0)
+    {
+        snprintf(time_str, len, "%d hrs, %d mins, %d secs", hrs, mins, secs);
+    }
+    else if (mins != 0)
+    {
+        snprintf(time_str, len, "%d mins, %d secs", mins, secs);
+    }
+    else
+    {
+        snprintf(time_str, len, "%d secs", secs);
+    }
+
+    return HAILER_SUCCESS;
+}
+
 /* Print all the devices and it's info present in the device shmList */
 static void hailer_clli_print_peer_list(void)
 {
-    int             i = 0;
-    int visited_nodes = 0;
-    hailerShmlist_t *shmList = NULL;
-    nodeList_t *curr_node    = NULL;
+    int i                        = 0;
+    int visited_nodes            = 0;
+    char timebuf[MAX_SIZE_80]    = {0};
+    char uptime_str[MAX_SIZE_80] = {0};
+    struct tm ts;
+    hailerShmlist_t *shmList   = NULL;
+    nodeList_t *curr_node      = NULL;
 
     shmList = hailer_client_shmlist_init();
     if(shmList == NULL)
@@ -42,11 +72,17 @@ static void hailer_clli_print_peer_list(void)
     {
         if(curr_node->client.isUsed == TRUE)
         {
+            /* Convert times into human readabale form */
+            ts = *localtime(&(curr_node->client.lastSeenTimestamp));
+            strftime(timebuf, sizeof(timebuf), "%a %Y-%m-%d %H:%M:%S %Z", &ts);
+
+            hailer_secs_to_time_string(curr_node->client.uptime, uptime_str, MAX_SIZE_80);
+
             printf("\n");
-            printf("IP : %s\n", inet_ntoa(curr_node->client.ipAddr));
-            printf("Last seen time : %ld\n", curr_node->client.lastSeenTimestamp);
-            printf("Last seen time : %Le\n", curr_node->client.uptime);
-            printf("MAC : %s\n", curr_node->client.mac);
+            printf("IP             : %s\n", inet_ntoa(curr_node->client.ipAddr));
+            printf("Last seen time : %s\n", timebuf);
+            printf("Peer Uptime    : %s\n", uptime_str);
+            printf("MAC            : %s\n", curr_node->client.mac);
             printf("\n");
             visited_nodes++;
         }
