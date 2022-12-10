@@ -35,6 +35,7 @@
 #define MSG      "msg"
 #define HOSTNAME "hostname"
 #define UPTIME   "uptime"
+#define MAC      "mac"
 
 #ifndef FALSE
 #define FALSE (0)

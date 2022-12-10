@@ -23,6 +23,8 @@
 #include <sys/sem.h>
 #ifdef HAILER_PEER_DISCOVERY_BROADCAST
 #include <pthread.h>
+#include <sys/ioctl.h>
+#include <linux/if.h>
 #endif
 // #include <malloc.h>
 
@@ -48,6 +50,7 @@ apps_data_t *g_apps_data_head      = NULL;
 #ifdef HAILER_PEER_DISCOVERY_BROADCAST
 int g_hailer_peer_discovery_rcv_fd = -1;
 hailerShmlist_t *shmList           = NULL;
+g_hailer_interface[MAX_SIZE_80]    = {0};
 #endif
 
 void sig_handler(int signum)
@@ -534,7 +537,6 @@ int hailer_process_events()
                 {
                     /* Destination App is within this node */
                     process_hailer_msgs(&msg_hdr);
-
                 }
             }
         }
@@ -542,12 +544,79 @@ int hailer_process_events()
     return HAILER_SUCCESS;
 }
 
-int main()
+/* Check if the interface passed to the hailer server is up. */
+static int hailer_is_interface_up(char *interface)
+{
+    int fd = -1, ret = -1;
+    struct ifreq ifr;
+
+    memset(&ifr, 0, sizeof(ifr));
+    /* Create a fd for invoking ioctl call */
+    fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(fd == -1)
+    {
+        HAILER_DBG_ERR("socket() call failed!");
+        return FALSE;
+    }
+
+    strncpy(ifr.ifr_name, interface, IFNAMSIZ);
+    if( ret = ioctl(fd, SIOCGIFFLAGS, &ifr) == -1)
+    {
+        HAILER_DBG_ERR("ioctl call() failed! errno = %d, ret = %d\n",errno, ret);
+        close(fd);
+        return FALSE;
+    }
+    if ((ifr.ifr_flags & IFF_UP) == 0)
+    {
+        HAILER_DBG_ERR("%s interface is NOT up!\n", interface);
+        close(fd);
+        return FALSE;
+    }
+
+    close(fd);
+    return TRUE;
+}
+
+/* Display info regarding, how to start hailer server */
+static void hailer_server_usgae(void)
+{
+    PRNT_RED
+    printf("usage: hailer_server <interface> \n");
+    PRNT_RST
+}
+
+int main(int argc, char * argv[])
 {
 
 #ifdef HAILER_PEER_DISCOVERY_BROADCAST
     pthread_t hailer_broadcast_threadid = 1;
 #endif
+
+    if(argc < 2)
+    {
+        hailer_server_usgae();
+    }
+    else
+    {
+        if(argv[1] == NULL)
+        {
+            HAILER_DBG_ERR("Invalid interface");
+            exit(-1);
+        }
+        else
+        {
+            if(hailer_is_interface_up(argv[1]) == FALSE)
+            {
+                HAILER_DBG_ERR("%s interface is not up. Hailer server exiting!!\n", argv[1]);
+                exit(-1);
+            }
+            else
+            {
+                strncpy(g_hailer_interface, argv[1], sizeof(argv[1])+1);
+                HAILER_DBG_INFO(" interface = %s", g_hailer_interface);
+            }
+        }
+    }
     /* Register the signal handler */
     //signal(SIGSEGV, sig_handler);   /* Signum = 11  */
     signal(SIGINT, sig_handler);    /* Signum = 2  */

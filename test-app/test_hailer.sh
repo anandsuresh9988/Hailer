@@ -14,4 +14,4 @@ sleep 1;
 killall hailer_server;
 rm -f /var/.hailer_server_address.sock;
 
-../bin/hailer_server &
+../bin/hailer_server wlan0 &

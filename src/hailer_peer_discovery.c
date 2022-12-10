@@ -17,6 +17,8 @@
 #include <sys/shm.h>	 /* shared memory functions and structs */
 #include <sys/sem.h>	 /* semaphore functions and structs */
 #include <errno.h>
+#include <sys/ioctl.h>
+#include <linux/if.h>
 
 /* Hailer specific headers */
 #include "./include/hailer_peer_discovery.h"
@@ -27,6 +29,7 @@
 extern unsigned int g_keep_running;
 extern unsigned int g_hailer_srver_loglvl;
 extern hailerShmlist_t *shmList;
+extern g_hailer_interface[MAX_SIZE_80];
 
 /* Print all the devices and it's info present in the device shmList */
 void hailer_print_peer_list()
@@ -165,18 +168,67 @@ void hailer_get_device_uptime(long double * uptime)
     }
 }
 
+/* Get the mac address of the interface passed. */
+static int hailer_get_mac_from_ifname(char *ifname, char *macstr)
+{
+    int fd = -1, ret = -1;
+    struct ifreq ifr;
+
+    memset(&ifr, 0, sizeof(ifr));
+
+    /* Create a fd for invoking ioctl call */
+    fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(fd == -1)
+    {
+        HAILER_DBG_ERR("socket() call failed!");
+        return HAILER_ERROR;
+    }
+
+    strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+    if(ret = ioctl(fd, SIOCGIFHWADDR, &ifr) == -1)
+    {
+        HAILER_DBG_ERR("ioctl call() failed! ifname = %s, errno = %d, ret = %d\n",ifname, errno, ret);
+        close(fd);
+        return HAILER_ERROR;
+    }
+    if ((ifr.ifr_flags & IFF_UP) == 0)
+    {
+        HAILER_DBG_ERR("%s interface is NOT up.\n", ifname);
+        close(fd);
+        return HAILER_ERROR;
+    }
+    else
+    {
+        /* Covert the MAC address to a string in the format xx:xx:xx:xx:xx:xx */
+        snprintf(macstr, MAC_BUFFER_SIZE, "%02x:%02x:%02x:%02x:%02x:%02x",
+        ifr.ifr_addr.sa_data[0], ifr.ifr_addr.sa_data[1], ifr.ifr_addr.sa_data[2],
+        ifr.ifr_addr.sa_data[3], ifr.ifr_addr.sa_data[4], ifr.ifr_addr.sa_data[5]);
+
+        HAILER_DBG_DEBUG("MAC of interface %s = %s\n", ifname, macstr);
+    }
+
+    close(fd);
+    return HAILER_SUCCESS;
+}
+
 /* Fill the jsonMsg object with required fileds */
 void hailer_fill_jsonMsg(struct json_object *jsonMsg)
 {
     char hostname [MAX_HOSTNAME_SIZE] = {0};
+    char mac_str[MAC_BUFFER_SIZE]     = {0};
     long double uptime;
     char *broadcast_msg = "Peer Boardcast messagae : Keep ALive";
 
+    /* Get all the details to broadcast */
+    hailer_get_mac_from_ifname(g_hailer_interface, mac_str);
     hailer_get_device_hostname(hostname);
     hailer_get_device_uptime(&uptime);
+
+    /* Fill the details in the json msg  */
     json_object_object_add(jsonMsg, MSG, json_object_new_string(broadcast_msg));
     json_object_object_add(jsonMsg, HOSTNAME, json_object_new_string(hostname));
     json_object_object_add(jsonMsg, UPTIME, json_object_new_double(uptime));
+    json_object_object_add(jsonMsg, MAC, json_object_new_string(mac_str));
 
 #if JSON_DBG
     HAILER_DBG_INFO("jsonMsg : %s\n", json_object_to_json_string_ext(jsonMsg, JSON_C_TO_STRING_SPACED | JSON_C_TO_STRING_PRETTY));
@@ -246,7 +298,8 @@ void hailer_add_device_to_list(clientDesc_t *client)
         if(curr_node->client.isUsed == FALSE)
         {
             strcpy(curr_node->client.hostname, client->hostname);
-            hailer_find_MAC_from_IP(inet_ntoa(client->ipAddr), curr_node->client.mac);
+            //hailer_find_MAC_from_IP(inet_ntoa(client->ipAddr), curr_node->client.mac);
+            strncpy(curr_node->client.mac, client->mac, MAC_BUFFER_SIZE);
             curr_node->client.ipAddr.s_addr = client->ipAddr.s_addr;
             curr_node->client.lastSeenTimestamp = client->lastSeenTimestamp;
             curr_node->client.uptime = client->uptime;
@@ -471,6 +524,7 @@ int hailer_process_broadcast_packets(char *buffer ,struct sockaddr_in cliAddr)
     clientDesc_t *client = (clientDesc_t *)malloc(sizeof(clientDesc_t));
     json_object *jsonMsg;
     json_object *uptime;
+    json_object *mac;
 
     memset(client, 0, sizeof(client));
     jsonMsg = json_tokener_parse(buffer);
@@ -492,7 +546,12 @@ int hailer_process_broadcast_packets(char *buffer ,struct sockaddr_in cliAddr)
         strncpy(client->hostname, host->h_name, sizeof(client->hostname));
     }
     
+    json_object_object_get_ex(jsonMsg, MAC, &mac);
+    strncpy(client->mac, json_object_get_string(mac),json_object_get_string_len(mac));
+
+    /* Extracted all info from json msg. Now check and update peer list */
     hailer_update_client_list(client);
+
     return HAILER_SUCCESS;
 }
 
