@@ -12,7 +12,6 @@
 
 /*********  Headers   *******/
 #include <stdio.h>
-#include <arpa/inet.h>
 #include "hailer_app_id.h"
 #include "hailer_msgtype.h"
 
@@ -25,12 +24,6 @@
 #define HAILER_SUCCESS 0
 #define HAILER_ERROR   -1
 
-/************* HAILER LOGLEVELS  *******/
-
-#define HAILER_LOGLEVEL_NONE 0
-#define HAILER_LOGLEVEL_ERR  1
-#define HAILER_LOGLEVEL_INFO 2
-#define HAILER_LOGLEVEL_DBG  3
 
 /********* LOGGING  ************/
 #define HAILER_DBG_ENABLE 1
@@ -59,22 +52,6 @@
 #define PRNT_RST printf("\033[0m");
 #define PRNT_RED printf("\033[1;31m");
 
-#define HAILER_MAX_PEERS           255   // Max no of peers hailer peer discovery mechanism can support.
-                                         // Use this value to intialise the shared memroy list to store peer details
-#define HAILER_SHMLIST_KEY         0x647651cefd98     // Key for the Hailer shared memory
-#define HAILER_SHM_LCK_KEY         0x647651cefd99     // Key for the Hailer semaphore for synchronising the shared memory access
-#define MAX_HOSTNAME_SIZE          256
-
-#ifndef FALSE
-#define FALSE (0)
-#endif //FALSE
-
-#ifndef TRUE
-#define TRUE (1)
-#endif  //TRUE
-
-#define MAX_SIZE_80      80
-#define MAC_BUFFER_SIZE  18
 
 /*********   Common structs   ******/
 typedef struct _hailer_msg_handle
@@ -90,34 +67,9 @@ typedef struct _hailer_msg_hdr
     int sndr_app_id;
     int rcvr_app_id;
     msg_type_t msg_type;
-    char data[0];
+    void *msg;
     int msg_len;
 } hailer_msg_hdr;
-
-typedef struct _clientDesc
-{
-    int isUsed;
-    struct in_addr ipAddr;
-    char hostname[MAX_HOSTNAME_SIZE];
-    char mac[18];
-    time_t lastSeenTimestamp;
-    long double uptime;
-} clientDesc_t;
-
-typedef struct _nodeList
-{
-    clientDesc_t client;
-    struct _nodeList *next;
-} nodeList_t;
-
-typedef struct _hailer_shmlist
-{
-    nodeList_t shmlistHead[HAILER_MAX_PEERS];
-    int activePeerCount;
-    int shmid;
-    int sem_lock_id;
-    struct _hailer_shmlist *shmaddr;
-} hailerShmlist_t;
 
 #define INITIALISE_HAILER_MSG_HDR(msg_hdr) \
         do { \
@@ -126,24 +78,10 @@ typedef struct _hailer_shmlist
             msg_hdr.sndr_app_id = -1; \
             msg_hdr.rcvr_app_id = APP_ID_HAILER_SERVER; \
             msg_hdr.msg_type = -1; \
-            msg_hdr.data[0] = 0; \
+            msg_hdr.msg = NULL; \
             msg_hdr.msg_len = 0; \
         } while(0)
 
-#define INITIALISE_HAILER_MSG_HDR_PTR(pmsg_hdr) \
-        do { \
-            if(pmsg_hdr == NULL) \
-            { \
-                return HAILER_ERROR; \
-            } \
-            strncpy(&pmsg_hdr->sndr_ip[0], "127.0.0.1", strlen("127.0.0.1") + 1); \
-            strncpy(&pmsg_hdr->rcvr_ip[0], "127.0.0.1", strlen("127.0.0.1") + 1); \
-            pmsg_hdr->sndr_app_id = -1; \
-            pmsg_hdr->rcvr_app_id = APP_ID_HAILER_SERVER; \
-            pmsg_hdr->msg_type = -1; \
-            pmsg_hdr->data[0] = 0; \
-            pmsg_hdr->msg_len = 0; \
-        } while(0)
 
 /**********  API's  ****************/
 
@@ -157,19 +95,10 @@ int hailer_send_msg(hailer_msg_hdr *msg_hdr, int fd);
 int hailer_rcv_msg(int fd, hailer_msg_hdr *msg_hdr);
 
 /* API to Rcv msgs without timeout */
-/* TODO: Need to implement */
-//int hailer_rcv_msg_with_timeout(hailer_msg_handle *msg_handle, hailer_msg_hdr *msg_hdr, int timeout);
+int hailer_rcv_msg_with_timeout(hailer_msg_handle *msg_handle, hailer_msg_hdr *msg_hdr, int timeout);
 
 /* Call this API during exit of all app using hailer*/
 int hailer_app_unregister(hailer_msg_handle *msg_handle);
 
-/* API to init the shmList shared memory for hailer client apps */
-hailerShmlist_t *hailer_client_shmlist_init(void);
-
-/* API to lock semaphore for synchronising shared memory access */
-void hailer_shmList_lock(int sem_lock_id);
-
-/* API to ulock semaphore for synchronising shared memory access */
-void hailer_shmList_unlock(int sem_lock_id);
 
 #endif //NBHUS_H
