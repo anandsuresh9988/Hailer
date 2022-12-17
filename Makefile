@@ -24,7 +24,7 @@ LIBS := -lhailer -lpthread -ljson-c
 TEST_APPS := test-app/test_app*.exe
 
 CC = gcc
-CFLAGS = -fPIC -Wall -Wextra -O2 -g
+CFLAGS = -fPIC -Wall -Wextra -O2 -g -ggdb3
 LDFLAGS = -shared
 RM = rm -f
 
