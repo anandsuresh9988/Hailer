@@ -197,6 +197,7 @@ int process_app_launch_event(int fd, hailer_msg_hdr *msg_hdr)
     if(g_apps_data_head == NULL)
     {
         g_apps_data_head = new_app;
+        new_app->next = NULL;
     }
     else
     {

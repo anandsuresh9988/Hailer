@@ -17,7 +17,7 @@ SERVER_DEPENDS := ${patsubst ${SERVER_SRC_DIR}/%.c, ${SERVER_OBJ_DIR}/%.d, ${SER
 LIBS := -lhailer
 
 CC = gcc
-CFLAGS = -fPIC -Wall -Wextra -O2 -g
+CFLAGS = -fPIC -Wall -Wextra -O2 -g -ggdb3
 LDFLAGS = -shared
 RM = rm -f
 
