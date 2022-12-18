@@ -30,7 +30,7 @@ void sig_handler(int signum)
 
 void usage(void)
 {
-    printf("usage: <testapp_name>  <Ip address of the other node> \n");
+    printf("usage: <testapp_name> <myip> <Ip address of the other node> \n");
 }
 
 void *hailer_testapp_send_packets()
@@ -41,7 +41,7 @@ void *hailer_testapp_send_packets()
     {
         {
             strncpy(msg_hdr.rcvr_ip, OtherNodeIpAddress, strlen(OtherNodeIpAddress) + 1);
-            //printf("rcvr_ip = %s\n", msg_hdr.rcvr_ip);
+            strncpy(msg_hdr.sndr_ip, myIpAddress, strlen(myIpAddress) + 1);
             msg_hdr.rcvr_app_id =  (g_msg_handle.app_id == APP_ID_APP_A) ? APP_ID_APP_B : APP_ID_APP_A;
             msg_hdr.sndr_app_id = g_msg_handle.app_id;
             msg_hdr.msg_type = (g_msg_handle.app_id == APP_ID_APP_A ) ? HAILER_MSG_1 : HAILER_MSG_2;
@@ -58,13 +58,16 @@ int main(int argc, char *argv[])
     struct timeval tv = {5, 0};
     hailer_msg_hdr msg_hdr;
 
-    if(argc < 2)
+    if(argc < 3)
     {
         usage();
+        exit(-1);
     }
     else
     {
-        strncpy(OtherNodeIpAddress, argv[1], strlen(argv[1]));
+        strncpy(myIpAddress, argv[1], strlen(argv[1]));
+        strncpy(OtherNodeIpAddress, argv[2], strlen(argv[2]));
+        printf("myIpAddress = %s\n", myIpAddress);
         printf("OtherNodeIpAddress = %s\n", OtherNodeIpAddress);
     }
     /* Register the signal handler */
@@ -94,12 +97,14 @@ int main(int argc, char *argv[])
                {
                     if( msg_hdr.msg_type < HAILER_MSG_TYPE_MAX)
                     {
-                        printf("App B Recieved msg_type=%d from Appid=%d RcvrIp=%s\n", msg_hdr.msg_type, msg_hdr.sndr_app_id, msg_hdr.rcvr_ip);
+                        printf("App B Recieved msg_type=%d from Appid=%d SndrIp=%s\n", msg_hdr.msg_type, msg_hdr.sndr_app_id, msg_hdr.sndr_ip);
                     }
                }
             }
         }
     }
+
+    pthread_join(testapp_sender_thread_id, NULL);
 
     if(hailer_app_unregister(&g_msg_handle) != HAILER_SUCCESS)
     {
