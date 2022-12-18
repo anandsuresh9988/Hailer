@@ -22,9 +22,4 @@ Hailer also provides a library which contains various APIs which can be used by 
 
 
 
-# Prerequisites
-
-1) libjson-c-dev
-
-  Install command : sudo apt install libjson-c-dev
 
