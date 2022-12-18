@@ -21,5 +21,9 @@ Hailer also provides a library which contains various APIs which can be used by 
 ![PlantUML model](http://www.plantuml.com/plantuml/png/hLDDRvmm4BtxLupIItke5Coj4bM0HGiIeMZ97df2Jh30gh6HCMtKNrydgkD8Nh6osiiUtkpxOERvRjL4wMtcQFt1n48KcQ4r27jY2n6w9SF0n0ZuzjqyayyMZsyHGcJJKcpp8rNeKJx3JIC72j4DVAZPEEcCRnGjJX9Unb6wBEb5DFFHaZ1ELKVLJ-D0nG36nTWwBsozZefIuGdWzmB-r9Zc5z73HRFOcdsddCjV7ZFUTOkDRk5qamGC09LWcX7EVXFDf80aGUXjI_3vgxy6-09bMjN5gR_lZdtQjdsTdfkyHFu_3TrfURHJSUoxSvuNNVUQfXBQS5ebd-Ywmhtv8QCvz6iaTsU8Wl957mzqrP2u8t_Q3vfTvxkmB-3_JsgRiPCKX-jWJyVEh_FD5__zJ0eFYeXraKg3dfJSnWdoYGX1-Gh_je3kd7NvgSgAFY_JfYdgAAHIbcHbseVgM-FwzVQmt0R3Wkmiy10KnBv4gn071udz85Op80XoZRz-6snBOOE4TpDK9WwH2MeA3Zed3jevHdTK3DlC_m00)
 
 
+# Prerequisites
 
+libjson-c-dev
+
+Install command : sudo apt install libjson-c-dev
 
