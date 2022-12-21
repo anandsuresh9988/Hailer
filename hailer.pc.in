@@ -1,0 +1,13 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+datarootdir=@datarootdir@
+includedir=@includedir@
+
+Name: @PACKAGE@
+Description: A lightweight inter-process and inter-node message transport framework for Linux systems.
+Version: @VERSION@
+URL: @PACKAGE_URL@
+Requires.private: json-c
+Libs: -L${libdir} -l@PACKAGE@-@VERSION@
+Cflags: -I${includedir}/@PACKAGE@-@VERSION@ -I${libdir}/@PACKAGE@-@VERSION@/include
