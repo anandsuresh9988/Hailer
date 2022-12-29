@@ -1,0 +1,31 @@
+# Ignore all logs
+*.log
+
+# Ignore all .o files
+*.o
+
+# Ignore .deps and .libs
+.deps
+.libs
+
+# Ignore everythig inside bin and build directories
+/bin/*
+/build/*
+
+# Ignore automatically generated Makefiles
+/Makefile
+/src/Makefile
+/test-app/Makefile
+
+# Ignore below misc files
+hailer_test_a
+hailer_test_b
+hailer.lo
+hailer_cli
+hailer_server
+libhailer.la
+stamp-h1
+/libtool
+/hailer.pc
+/config.status
+
