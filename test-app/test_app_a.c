@@ -40,6 +40,7 @@ void *hailer_testapp_send_packets()
     while(g_keep_running)
     {
         {
+            INITIALISE_HAILER_MSG_HDR(msg_hdr);
             strncpy(msg_hdr.rcvr_ip, OtherNodeIpAddress, strlen(OtherNodeIpAddress) + 1);
             strncpy(msg_hdr.sndr_ip, myIpAddress, strlen(myIpAddress) + 1);
             msg_hdr.rcvr_app_id =  (g_msg_handle.app_id == APP_ID_APP_A) ? APP_ID_APP_B : APP_ID_APP_A;
@@ -85,6 +86,8 @@ int main(int argc, char *argv[])
 
     while(g_keep_running)
     {
+        tv.tv_sec = 5;
+        tv.tv_usec = 0;
         FD_SET(g_msg_handle.comm_fd, &read_fds);
         ret = select(g_msg_handle.comm_fd+1, &read_fds, NULL, NULL, &tv);
 
