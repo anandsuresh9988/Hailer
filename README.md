@@ -118,5 +118,70 @@ pi@raspberrypi:~/Hailer/bin $ tree
         └── hailer.pc
 ```
 
+# How to test?
 
+#### Start Hailer server
 
+```
+hailer_server <LAN interface> &
+```
+**Note:** Hailer Server will be using the MAC address of the LAN interfcae passed to it in the peer discovery packets
+
+To test Hailer messaging capabilities, test apps are provided in the [Hailer/test-app](https://github.com/anandsuresh9988/Hailer/tree/main/test-app) folder. [test_hailer.sh](https://github.com/anandsuresh9988/Hailer/blob/develop/test-app/test_hailer.sh) script is provided in the same folder, which will kill running test apps and restart hailer server.
+
+```
+cd Hailer/test-app
+sudo ./test_hailer.sh  - This will kill runnting test apps and restart hailer server.
+```
+
+#### Testing inter-app messaging within same node
+
+After running hailer server, run the test apps as shown:
+
+```
+sudo ./hailer_test_a "127.0.0.1" "127.0.0.1" &
+sudo ./hailer_test_b "127.0.0.1" "127.0.0.1" &
+
+Here 127.0.0.1(localhost) indicates that both the sender and recieving apps are within the same node
+```
+We should be able to see output like shown below:
+
+```
+App B Recieved msg_type=6 from Appid=2 SndrIp=127.0.0.1
+App A Recieved msg_type=7 from Appid=3 SndrIp=127.0.0.1
+App B Recieved msg_type=6 from Appid=2 SndrIp=127.0.0.1
+App A Recieved msg_type=7 from Appid=3 SndrIp=127.0.0.1
+```
+
+#### Testing inter-node messaging
+
+     1) Connect both the nodes to the same network.
+     2) After running hailer server, run the test apps. This has to be done in both nodes.
+
+```
+sudo ./hailer_test_<a/b> <IP address of the node in which test app is running> <IP address of the other node> &
+
+Eg: node1
+sudo ./hailer_test_a "192.168.1.10" "192.168.1.11" &
+sudo ./hailer_test_b "192.168.1.10" "192.168.1.11" &
+
+Eg: node2
+sudo ./hailer_test_a "192.168.1.11" "192.168.1.10" &
+sudo ./hailer_test_b "192.168.1.11" "192.168.1.10" &
+```
+
+In the node with IP address "192.168.1.10", we should be able to see below messages.
+```
+App A Recieved msg_type=7 from Appid=3 SndrIp=192.168.1.11
+App B Recieved msg_type=6 from Appid=2 SndrIp=192.168.1.11
+App A Recieved msg_type=7 from Appid=3 SndrIp=192.168.1.11
+App B Recieved msg_type=6 from Appid=2 SndrIp=192.168.1.11
+```
+
+In the node with IP address "192.168.1.11", we should be able to see below messages.
+```
+App A Recieved msg_type=7 from Appid=3 SndrIp=192.168.1.10
+App B Recieved msg_type=6 from Appid=2 SndrIp=192.168.1.10
+App A Recieved msg_type=7 from Appid=3 SndrIp=192.168.1.10
+App B Recieved msg_type=6 from Appid=2 SndrIp=192.168.1.10
+```
